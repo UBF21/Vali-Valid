@@ -1,0 +1,27 @@
+{
+  "name": "vali-valid",
+  "version": "1.2.9",
+  "description": "ValiValid es un completo gestor de validación de formularios para ReactJS.Facilita la configuración y manejo de diversas validaciones predeterminadas, como longitud de cadenas, formatos de email, URL, tipos y tamaños de archivos, así como validaciones personalizadas. Además, soporta manejo avanzado de números y decimales, asegurando que los datos ingresados cumplan con los requisitos específicos de cada campo.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "reactjs",
+    "ts",
+    "validation",
+    "form",
+    "js"
+  ],
+  "author": "Felipe Rafael MM <teabajo_ubf@hotmail.com> (https://fm-portafolio.netlify.app/)",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
