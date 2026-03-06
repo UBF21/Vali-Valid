@@ -1,27 +1,56 @@
 {
   "name": "vali-valid",
-  "version": "1.2.9",
-  "description": "ValiValid es un completo gestor de validación de formularios para ReactJS.Facilita la configuración y manejo de diversas validaciones predeterminadas, como longitud de cadenas, formatos de email, URL, tipos y tamaños de archivos, así como validaciones personalizadas. Además, soporta manejo avanzado de números y decimales, asegurando que los datos ingresados cumplan con los requisitos específicos de cada campo.",
+  "version": "2.1.2",
+  "description": "ValiValid — TypeScript form validation library for React. 63 built-in validators (string, numeric, date, file, array, geo, format, cross-field, async), a useValiValid hook with touchedFields, dirtyFields, handleBlur and validateOnBlur support, dynamic rule management at runtime, i18n (en/es), and a standalone ValiValid engine for server-side or non-React usage.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "src"
+    "src",
+    "docs"
   ],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
+    "react",
     "reactjs",
-    "ts",
+    "typescript",
     "validation",
     "form",
-    "js"
+    "form-validation",
+    "hook",
+    "async",
+    "async-validation",
+    "i18n",
+    "validators",
+    "schema",
+    "field-validation",
+    "dynamic-rules",
+    "file-validation",
+    "image-validation",
+    "cross-field",
+    "vali-valid"
   ],
-  "author": "Felipe Rafael MM <teabajo_ubf@hotmail.com> (https://fm-portafolio.netlify.app/)",
+  "author": "Felipe Rafael Montenegro Morriberon <teabajo_ubf@hotmail.com> (https://fm-portafolio.netlify.app/)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UBF21/Vali-Valid"
+  },
+  "homepage": "https://github.com/UBF21/Vali-Valid#readme",
+  "bugs": {
+    "url": "https://github.com/UBF21/Vali-Valid/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
   "devDependencies": {
+    "@types/react": "^18.3.28",
     "typescript": "^5.5.4"
   }
 }
