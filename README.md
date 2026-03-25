@@ -1,9 +1,24 @@
-# ValiValid
+# vali-valid v3.1.0
 
-> TypeScript form validation library for React — 63 built-in validators, async support, i18n (en/es), dynamic rule management, and a `useValiValid` hook with `touchedFields`, `dirtyFields`, `handleBlur` and `validateOnBlur`.
+> Framework-agnostic TypeScript validation engine
 
-[![npm version](https://img.shields.io/npm/v/vali-valid)](https://www.npmjs.com/package/vali-valid)
-[![license](https://img.shields.io/npm/l/vali-valid)](https://github.com/UBF21/Vali-Valid/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/vali-valid?color=22d3ee&label=npm)](https://www.npmjs.com/package/vali-valid)
+[![license](https://img.shields.io/npm/l/vali-valid?color=22d3ee)](https://github.com/UBF21/Vali-Valid/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-4f46e5)](https://www.typescriptlang.org/)
+
+---
+
+## What's new in v3
+
+| Feature | v2 | v3.1.0 |
+|---|---|---|
+| Built-in validators | 63 | **74+** |
+| Framework support | React only | React, Vue 3, Svelte, Angular |
+| Build output | CJS only | **ESM + CJS dual build** |
+| i18n locales | en, es | **en, es, pt, fr, de** |
+| Rule syntax | Array config only | Array config + **fluent RuleBuilder** |
+| Core subpath | — | **`vali-valid/core`** (zero framework deps) |
+| Error shape per field | `string \| null` | **`string[] \| null`** (all errors) |
 
 ---
 
@@ -11,434 +26,313 @@
 
 ```bash
 npm install vali-valid
+
+# Framework adapters (install the one you need)
+npm install vali-valid-react
+npm install vali-valid-vue
+npm install vali-valid-svelte
+npm install vali-valid-angular
 ```
 
 ---
 
-## Quick start
+## Two ways to define validations
 
-```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+Both syntaxes are fully supported and can be mixed freely.
+
+### Traditional (array config)
+
+```ts
+import { ValiValid, ValidationType } from 'vali-valid';
 
 type LoginForm = { email: string; password: string };
 
-export function LoginForm() {
-  const { form, errors, isValid, handleChange, validate, reset } =
-    useValiValid<LoginForm>({
-      initial: { email: '', password: '' },
-      validations: [
-        {
-          field: 'email',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.Email },
-          ],
-        },
-        {
-          field: 'password',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.MinLength, value: 8 },
-          ],
-        },
-      ],
-    });
+const engine = new ValiValid<LoginForm>([
+  {
+    field: 'email',
+    validations: [
+      { type: ValidationType.Required },
+      { type: ValidationType.Email },
+    ],
+  },
+  {
+    field: 'password',
+    validations: [
+      { type: ValidationType.Required },
+      { type: ValidationType.MinLength, value: 8 },
+    ],
+  },
+]);
+```
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const errs = await validate();
-    if (!Object.values(errs).some(Boolean)) console.log('Submit:', form);
-  };
+### Builder (fluent, new in v3)
+
+```ts
+import { ValiValid, rule } from 'vali-valid';
+
+type LoginForm = { email: string; password: string };
+
+const engine = new ValiValid<LoginForm>([
+  { field: 'email',    validations: rule().required().email().build() },
+  { field: 'password', validations: rule().required().minLength(8).passwordStrength().build() },
+]);
+```
+
+### Running validation
+
+```ts
+// Synchronous
+const errors = engine.validateSync({ email: 'bad', password: '123' });
+// { email: ['Invalid email address.'], password: ['Minimum 8 characters.', '...'] }
+
+// Asynchronous (required when using AsyncPattern or image dimension validators)
+const errors = await engine.validateAsync({ email: 'user@example.com', password: 'Secret1!' });
+// { email: null, password: null }
+
+// Single field
+const fieldErrors = engine.validateFieldSync('email', 'not-an-email');
+// ['Invalid email address.']
+```
+
+---
+
+## React quick start
+
+Install the React adapter first: `npm install vali-valid-react`
+
+```tsx
+import { rule, useValiValid } from 'vali-valid-react';
+
+type RegisterForm = {
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
+
+export function RegisterForm() {
+  const {
+    form,
+    errors,
+    isValid,
+    isValidating,
+    handleChange,
+    handleSubmit,
+    reset,
+  } = useValiValid<RegisterForm>({
+    initial: { email: '', password: '', confirmPassword: '' },
+    validateOnSubmit: true,
+    validations: [
+      { field: 'email',           validations: rule().required().email().build() },
+      { field: 'password',        validations: rule().required().minLength(8).passwordStrength().build() },
+      { field: 'confirmPassword', validations: rule().required().matchField('password', 'Passwords do not match.').build() },
+    ],
+  });
+
+  const onSubmit = handleSubmit(async (data) => {
+    await api.register(data);
+    reset();
+  });
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="email"
-        value={form.email}
-        onChange={(e) => handleChange('email', e.target.value)}
-        placeholder="Email"
-      />
-      {errors.email && <p style={{ color: 'red' }}>{errors.email}</p>}
+    <form onSubmit={onSubmit}>
+      <input value={form.email} onChange={(e) => handleChange('email', e.target.value)} />
+      {errors.email?.map((msg, i) => <p key={i} className="error">{msg}</p>)}
 
-      <input
-        type="password"
-        value={form.password}
-        onChange={(e) => handleChange('password', e.target.value)}
-        placeholder="Password"
-      />
-      {errors.password && <p style={{ color: 'red' }}>{errors.password}</p>}
+      <input type="password" value={form.password} onChange={(e) => handleChange('password', e.target.value)} />
+      {errors.password?.map((msg, i) => <p key={i} className="error">{msg}</p>)}
 
-      <button type="submit" disabled={!isValid}>Sign in</button>
-      <button type="button" onClick={() => reset()}>Clear</button>
+      <input type="password" value={form.confirmPassword} onChange={(e) => handleChange('confirmPassword', e.target.value)} />
+      {errors.confirmPassword?.map((msg, i) => <p key={i} className="error">{msg}</p>)}
+
+      <button type="submit" disabled={!isValid || isValidating}>
+        {isValidating ? 'Validating…' : 'Register'}
+      </button>
     </form>
   );
 }
 ```
 
----
-
-## `useValiValid` hook
+### Hook options (v3.1.0)
 
 ```ts
-const {
-  form,            // current form state
-  errors,          // { [field]: string | null }
-  isValid,         // true when all errors are null
-  isValidating,    // true while async rules run
-  touchedFields,   // Set<keyof T> — fields the user has interacted with
-  dirtyFields,     // Set<keyof T> — fields that differ from initial value
-  handleChange,    // (field, value) => void
-  handleBlur,      // (field) => void — marks as touched; validates if validateOnBlur
-  validate,        // () => Promise<FormErrors<T>> — validates all fields
-  reset,           // (partial?: Partial<T>) => void
-  addFieldValidation,     // add rules to a field at runtime
-  removeFieldValidation,  // remove a specific rule type from a field
-  setFieldValidations,    // replace all rules for a field
-  clearFieldValidations,  // remove all rules for a field
-} = useValiValid<T>({
-  initial,          // T — initial form values
-  validations?,     // FieldValidationConfig<T>[]
-  validateOnBlur?,  // boolean — if true, skip validation on change; validate on blur instead
-});
+useValiValid<T>({
+  initial: T;
+  validations?: FieldValidationConfig<T>[];
+  validateOnSubmit?: boolean;  // suppress errors until first submit attempt
+  debounceMs?: number;         // debounce async validation (ms, default 0)
+})
 ```
+
+### Additional hook methods (v3.1.0)
+
+| Method | Description |
+|---|---|
+| `trigger(field?)` | Programmatically validate one field or the entire form |
+| `clearErrors(field?)` | Clear errors for one field or all fields |
+| `setServerErrors(errors)` | Inject server-side validation messages |
+| `setValues(values)` | Pre-fill fields without triggering validation |
+| `addFieldValidation(field, rules)` | Add rules to a field at runtime |
+| `removeFieldValidation(field, type)` | Remove a specific rule type from a field |
+| `setFieldValidations(field, rules)` | Replace all rules for a field |
+| `clearFieldValidations(field)` | Remove all rules from a field |
+
+---
+
+## Core subpath export
+
+Use `vali-valid/core` to import the engine and builder with zero framework dependencies. Ideal for Vue, Svelte, Angular, or vanilla TypeScript.
+
+```ts
+import { ValiValid, rule, setLocale } from 'vali-valid/core';
+
+const engine = new ValiValid([
+  { field: 'username', validations: rule().required().minLength(3).alphaNumeric().build() },
+]);
+
+const errors = engine.validateFieldSync('username', 'ab!');
+// ['Minimum 3 characters.', 'Only alphanumeric characters are allowed.']
+```
+
+The `vali-valid/core` entry is available in both ESM and CJS builds.
 
 ---
 
 ## i18n
 
-Messages default to English. Call `setLocale` once at app startup before any component mounts:
-
 ```ts
 import { setLocale } from 'vali-valid';
 
-setLocale('es'); // 'en' | 'es'
+setLocale('en'); // English (default)
+setLocale('es'); // Spanish
+setLocale('pt'); // Portuguese
+setLocale('fr'); // French
+setLocale('de'); // German
 ```
 
+All built-in error messages are automatically translated for the active locale. You can also set a per-instance locale to keep SSR safe:
+
 ```ts
-// Auto-detect browser language
-import { setLocale } from 'vali-valid';
-setLocale(navigator.language.startsWith('es') ? 'es' : 'en');
+const engine = new ValiValid(configs, { locale: 'fr' });
 ```
 
 ---
 
-## validateOnBlur + touchedFields + dirtyFields
+## Error structure (v3 breaking change)
+
+In v3, `FormErrors<T>` returns `string[] | null` per field instead of `string | null`.
+
+```ts
+type FormErrors<T> = { [key in keyof T]?: string[] | null };
+```
+
+| Value | Meaning |
+|---|---|
+| `string[]` | One or more validation error messages |
+| `null` | Field validated and passed |
+| `undefined` | Field not yet validated |
+
+Rendering errors:
 
 ```tsx
-const { form, errors, touchedFields, dirtyFields, handleChange, handleBlur } =
-  useValiValid<ContactForm>({
-    initial: { name: '', email: '' },
-    validateOnBlur: true,  // errors appear only after blur
-    validations: [...],
-  });
+// All errors (recommended)
+{errors.email?.map((msg, i) => <p key={i}>{msg}</p>)}
 
-// Show error only after user has left the field
-const showError = (field: keyof ContactForm) =>
-  touchedFields.has(field) ? errors[field] : null;
-
-return (
-  <input
-    value={form.name}
-    onChange={(e) => handleChange('name', e.target.value)}
-    onBlur={() => handleBlur('name')}
-  />
-);
+// First error only (v2 migration style)
+{errors.email?.[0] && <p>{errors.email[0]}</p>}
 ```
 
 ---
 
-## All 63 validators
+## 74+ built-in validators
 
-### String (23)
+### String
+`Required`, `MinLength`, `MaxLength`, `ExactLength`, `Email`, `Url`, `Alpha`, `AlphaNumeric`, `AlphaDash`, `LowerCase`, `UpperCase`, `NoWhitespace`, `NotEmpty`, `Contains`, `StartsWith`, `EndsWith`, `Slug`, `PasswordStrength`, `HexColor`, `IPv4`, `IPv6`, `UUID`, `MACAddress`, `Json`, `Phone`, `CreditCard`, `IBAN`, `PostalCode`, `Pattern`, `Base64`, `DataURI`, `MimeType`, `JWT`, `SemVer`, `NoHTML`
 
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `Required` | — | Field must not be empty |
-| `MinLength` | `value: number` | Minimum character count |
-| `MaxLength` | `value: number` | Maximum character count |
-| `ExactLength` | `value: number` | Exact character count |
-| `Email` | — | Valid email format |
-| `Url` | — | Valid URL format |
-| `Alpha` | — | Letters only |
-| `AlphaNumeric` | — | Letters and numbers only |
-| `LowerCase` | — | Lowercase only |
-| `UpperCase` | — | Uppercase only |
-| `NoWhitespace` | — | No spaces allowed |
-| `Contains` | `value: string` | Must contain substring |
-| `StartsWith` | `value: string` | Must start with prefix |
-| `EndsWith` | `value: string` | Must end with suffix |
-| `Slug` | — | Lowercase letters, numbers, hyphens |
-| `PasswordStrength` | — | Uppercase + lowercase + number + special char |
-| `HexColor` | — | Valid hex color (#RGB or #RRGGBB) |
-| `IPv4` | — | Valid IPv4 address |
-| `UUID` | — | Valid UUID v4 |
-| `Json` | — | Valid JSON string |
-| `Phone` | — | Valid phone number |
-| `CreditCard` | — | Luhn algorithm |
-| `Pattern` | `value: (v) => boolean` | Custom validation function |
+### Numeric
+`DigitsOnly`, `NumberRange`, `NumberPositive`, `NumberNegative`, `Integer`, `MultipleOf`, `GreaterThan`, `LessThan`, `GreaterThanOrEqual`, `LessThanOrEqual`, `Precision`, `Finite`, `Port`
 
-### Numeric (8)
+### Date & Time
+`DateFormat`, `MinDate`, `MaxDate`, `FutureDate`, `PastDate`, `DateAfter`, `DateBefore`, `DateAfterField`, `DateBeforeField`, `DateRange`, `Time`
 
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `DigitsOnly` | — | Only digit characters |
-| `NumberRange` | `value: [min, max]` | Value within range |
-| `NumberPositive` | — | Value > 0 |
-| `NumberNegative` | — | Value < 0 |
-| `Integer` | — | No decimal part |
-| `MultipleOf` | `value: number` | Divisible by N |
-| `GreaterThan` | `value: number` | Value > N |
-| `LessThan` | `value: number` | Value < N |
-| `Precision` | `value: number` | Max N decimal places |
+### File & Image
+`FileType`, `FileSize`, `FileDimensions`, `ImageAspectRatio`, `ImageMinDimensions`, `ImageMaxDimensions`
 
-### Date (6)
+### Array
+`ArrayMinLength`, `ArrayMaxLength`, `ArrayExactLength`, `ArrayUnique`, `ArrayContains`, `ArrayItems`
 
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `DateFormat` | `format: DateFormat` | Matches date format pattern |
-| `MinDate` | `value: string \| Date` | On or after date |
-| `MaxDate` | `value: string \| Date` | On or before date |
-| `FutureDate` | — | Date must be in the future |
-| `PastDate` | — | Date must be in the past |
-| `DateAfter` | `value: string \| Date` | Strictly after date |
-| `DateBefore` | `value: string \| Date` | Strictly before date |
+### Cross-field & Conditional
+`MatchField`, `NotMatchField`, `RequiredIf`, `RequiredUnless`, `OneOf`, `NotOneOf`, `Latitude`, `Longitude`
 
-### File & Image (6)
+### Logic modifiers
+`Optional`, `Nullable`, `Bail`, `Not`, `If`, `Or` (fluent `.or([...])`)
 
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `FileType` | `value: TypeFile[] \| string[]` | Allowed MIME types |
-| `FileSize` | `value: number \| FileSize` | Max file size in bytes |
-| `FileDimensions` | `value: { width, height }` | Exact image dimensions (async) |
-| `ImageAspectRatio` | `value: { width, height }, tolerance?` | Aspect ratio check (async) |
-| `ImageMinDimensions` | `value: { width?, height? }` | Minimum image dimensions (async) |
-| `ImageMaxDimensions` | `value: { width?, height? }` | Maximum image dimensions (async) |
-
-### Cross-field (4)
-
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `MatchField` | `field: string` | Must equal another field |
-| `NotMatchField` | `field: string` | Must not equal another field |
-| `RequiredIf` | `condition: (form) => boolean` | Required when condition is true |
-| `RequiredUnless` | `condition: (form) => boolean` | Required unless condition is true |
-
-### Array (4)
-
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `ArrayMinLength` | `value: number` | Array must have at least N elements |
-| `ArrayMaxLength` | `value: number` | Array must have at most N elements |
-| `ArrayUnique` | — | No duplicate elements |
-| `ArrayContains` | `value: any` | Array must contain the value |
-
-### Enum / Set (1)
-
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `OneOf` | `value: any[]` | Must be one of the allowed values |
-
-### Format (2)
-
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `Time` | `format?: '24h' \| '12h'` | Valid time (HH:MM or HH:MM AM/PM) |
-| `NoHTML` | — | No HTML tags allowed |
-
-### Geo / Finance / Other (6)
-
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `IBAN` | — | Valid IBAN (mod-97 algorithm) |
-| `PostalCode` | `country: string` | Postal code by country (US, CA, UK, DE, FR, ES, IT, AU, NL, BR, MX, AR) |
-| `Latitude` | — | Number between -90 and 90 |
-| `Longitude` | — | Number between -180 and 180 |
-| `SemVer` | — | Semantic version (X.Y.Z) |
-| `Base64` | — | Valid Base64 string |
-
-### Async (1)
-
-| ValidationType | Config | Description |
-|----------------|--------|-------------|
-| `AsyncPattern` | `asyncFn: (value, form) => Promise<boolean>` | Custom async validation |
+### Async
+`AsyncPattern` — custom async function, runs after all sync rules pass
 
 ---
 
-## Dynamic rule management
+## Engine options
 
 ```ts
-const { addFieldValidation, removeFieldValidation, setFieldValidations, clearFieldValidations } =
-  useValiValid({ initial, validations });
-
-// Add rules to a field
-addFieldValidation('promoCode', [
-  { type: ValidationType.Required },
-  { type: ValidationType.ExactLength, value: 8 },
-]);
-
-// Remove a specific rule type
-removeFieldValidation('promoCode', ValidationType.Required);
-
-// Replace all rules for a field
-setFieldValidations('username', [
-  { type: ValidationType.Required },
-  { type: ValidationType.MinLength, value: 6 },
-]);
-
-// Remove all rules from a field
-clearFieldValidations('promoCode');
+new ValiValid(configs, {
+  locale: 'en',           // per-instance locale (SSR-safe)
+  criteriaMode: 'all',    // 'all' (default) | 'firstError'
+  asyncTimeout: 5000,     // per-async-rule timeout in ms (0 = no timeout)
+})
 ```
 
 ---
 
-## Standalone engine (no React)
-
-The `ValiValid` class has **zero React dependencies** — use it in Vue, Angular, Svelte, Node.js, or any TypeScript environment.
+## RuleBuilder reference
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { rule } from 'vali-valid';
 
-type UserDto = { username: string; email: string };
+// Basic chain
+rule().required().email().build()
 
-const validator = new ValiValid<UserDto>([
-  {
-    field: 'username',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 3 },
-    ],
-  },
-  {
-    field: 'email',
-    validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }],
-  },
-]);
+// Conditional and cross-field
+rule().required().matchField('password').build()
+rule().requiredIf('role', 'admin').minLength(10).build()
 
-// Sync
-const errors = validator.validateSync({ username: 'j', email: 'bad' });
-console.log(errors); // { username: '...', email: '...' }
+// OR logic
+rule().or([
+  rule().email().build(),
+  rule().alphaNumeric().minLength(3).build(),
+]).build()
 
-// Async
-const allErrors = await validator.validateAsync({ username: 'john', email: 'john@ok.com' });
+// Bail on first failure (stop further checks)
+rule().bail().required().minLength(8).build()
 
-// Single field
-console.log(validator.validateFieldSync('email', 'bad')); // error message
-console.log(validator.validateFieldSync('email', 'ok@ok.com')); // null
+// Optional field (skip all rules if empty)
+rule().optional().email().build()
 ```
-
-### Vue 3
-
-```vue
-<script setup lang="ts">
-import { ref, computed } from 'vue';
-import { ValiValid, ValidationType } from 'vali-valid';
-
-type Form = { email: string; password: string };
-const form = ref<Form>({ email: '', password: '' });
-const errors = ref<Partial<Record<keyof Form, string | null>>>({});
-
-const engine = new ValiValid<Form>([
-  { field: 'email', validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }] },
-  { field: 'password', validations: [{ type: ValidationType.Required }, { type: ValidationType.MinLength, value: 8 }] },
-]);
-
-const isValid = computed(() => !Object.values(errors.value).some(Boolean));
-
-function handleChange(field: keyof Form, value: string) {
-  form.value = { ...form.value, [field]: value };
-  errors.value = { ...errors.value, [field]: engine.validateFieldSync(field, value) };
-}
-
-async function handleSubmit() {
-  errors.value = engine.validateSync(form.value);
-  if (isValid.value) await submitToApi(form.value);
-}
-</script>
-```
-
-### Angular
-
-```ts
-// validation.service.ts
-import { Injectable } from '@angular/core';
-import { ValiValid, ValidationType } from 'vali-valid';
-
-type LoginForm = { email: string; password: string };
-
-@Injectable({ providedIn: 'root' })
-export class LoginValidationService {
-  private engine = new ValiValid<LoginForm>([
-    { field: 'email', validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }] },
-    { field: 'password', validations: [{ type: ValidationType.Required }, { type: ValidationType.MinLength, value: 8 }] },
-  ]);
-
-  validateField(field: keyof LoginForm, value: string) {
-    return this.engine.validateFieldSync(field, value);
-  }
-
-  async validateAll(form: LoginForm) {
-    return this.engine.validateAsync(form);
-  }
-}
-```
-
-> Full Vue and Angular examples are in [`docs/en/engine.md`](./docs/en/engine.md).
-
----
-
-## Number fields
-
-```ts
-{
-  field: 'price',
-  isDecimal: true,   // accepts decimals → stored as Number
-  validations: [
-    { type: ValidationType.Required },
-    { type: ValidationType.NumberPositive },
-    { type: ValidationType.Precision, value: 2 },
-  ],
-}
-```
-
-| `isNumber` | `isDecimal` | Behavior |
-|------------|-------------|----------|
-| `false` / omitted | — | Value treated as string |
-| `true` | `false` / omitted | Strips non-numeric chars, stored as integer |
-| `true` | `true` | Stored as decimal number |
-
----
-
-## What's new in v2.1
-
-| Feature | v2.0 | v2.1 |
-|---------|------|------|
-| Validators | 43 | **63** |
-| i18n | — | `setLocale('en' \| 'es')` |
-| `validateOnBlur` | — | ✓ |
-| `touchedFields` | — | ✓ |
-| `dirtyFields` | — | ✓ |
-| `handleBlur` | — | ✓ |
-| `GreaterThan` / `LessThan` / `Precision` | — | ✓ |
-| `DateAfter` / `DateBefore` | — | ✓ |
-| `OneOf` | — | ✓ |
-| `NotMatchField` / `RequiredUnless` | — | ✓ |
-| Array validators | — | ✓ |
-| `Time` / `NoHTML` | — | ✓ |
-| `IBAN` / `PostalCode` / `Latitude` / `Longitude` | — | ✓ |
-| `SemVer` / `Base64` | — | ✓ |
 
 ---
 
 ## Documentation
 
-Full documentation available in [`docs/`](./docs/):
+Full API reference and guides: [vali-valid-docs.netlify.app](https://vali-valid-docs.netlify.app/)
 
-| Language | Link |
-|----------|------|
-| English | [docs/en/](./docs/en/) |
-| Español | [docs/es/](./docs/es/) |
+- [Getting started](./docs/en/getting-started.md)
+- [All validators](./docs/en/validators.md)
+- [RuleBuilder](./docs/en/builder.md)
+- [Async validation](./docs/en/async.md)
+- [Dynamic rules](./docs/en/dynamic.md)
+- [i18n](./docs/en/types.md)
+- [Engine API](./docs/en/engine.md)
+- [Hook API](./docs/en/hook.md)
 
-Includes: getting started, hook API, all validators, async guide, dynamic rules, engine usage, types reference, architecture diagrams, and **examples**.
+---
+
+## Framework packages
+
+| Framework | Package | Status |
+|---|---|---|
+| React | `vali-valid-react` | Available |
+| Vue 3 | `vali-valid-vue` | Available |
+| Svelte | `vali-valid-svelte` | Available |
+| Angular | `vali-valid-angular` | Available |
 
 ---
 

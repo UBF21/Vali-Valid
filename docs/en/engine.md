@@ -12,7 +12,7 @@ The `ValiValid<T>` class is the core engine behind `useValiValid`. It manages va
 ## Import
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 ```
 
 ---
@@ -20,23 +20,39 @@ import { ValiValid, ValidationType } from 'vali-valid';
 ## Constructor
 
 ```ts
-new ValiValid<T>(configs?: FieldValidationConfig<T>[])
+new ValiValid<T>(configs?: FieldValidationConfig<T>[], options?: ValiValidOptions)
 ```
 
+### `ValiValidOptions`
+
 ```ts
+interface ValiValidOptions {
+  criteriaMode?: 'firstError' | 'all';  // default: 'all'
+  locale?: string;                       // per-instance locale override (SSR-safe)
+  asyncTimeout?: number;                 // ms timeout per async rule, 0 = no timeout (default)
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `criteriaMode` | `'all'` | `'all'` collects every failing rule message per field. `'firstError'` stops after the first failure and returns a single-element `string[]`. |
+| `locale` | global locale | Overrides the global locale for this engine instance. Useful in SSR environments where each request may need a different language. |
+| `asyncTimeout` | `0` | Races each async rule against a timer. If the rule does not resolve within `asyncTimeout` ms it is treated as passing (no error produced). |
+
+```ts
+import { ValiValid, rule, ValidationType } from 'vali-valid';
+
 type Form = { email: string; age: number };
 
 const engine = new ValiValid<Form>([
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'age',
     isNumber: true,
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Required },
       { type: ValidationType.NumberRange, value: [18, 99] },
@@ -53,14 +69,14 @@ const engine = new ValiValid<Form>([
 
 ```ts
 const errors = engine.validateSync({ email: 'bad', age: 15 });
-// errors.email → 'Does not have email format.'
-// errors.age   → 'The value must be between 18 and 99.'
+// errors.email → ['Does not have email format.']
+// errors.age   → ['The value must be between 18 and 99.']
 ```
 
-### `validateFieldSync(field, value): string | null`
+### `validateFieldSync(field, value): string[] | null`
 
 ```ts
-engine.validateFieldSync('email', 'hello'); // 'Does not have email format.'
+engine.validateFieldSync('email', 'hello'); // ['Does not have email format.']
 engine.validateFieldSync('email', 'a@b.co'); // null
 ```
 
@@ -70,7 +86,7 @@ engine.validateFieldSync('email', 'a@b.co'); // null
 const errors = await engine.validateAsync(form);
 ```
 
-### `validateFieldAsync(field, value, form): Promise<string | null>`
+### `validateFieldAsync(field, value, form): Promise<string[] | null>`
 
 ```ts
 const error = await engine.validateFieldAsync('avatar', file, form);
@@ -81,9 +97,11 @@ const error = await engine.validateFieldAsync('avatar', file, form);
 ## Dynamic rule management
 
 ```ts
-engine.addFieldValidation('username', [{ type: ValidationType.Slug }]);
+import { rule, ValidationType } from 'vali-valid';
+
+engine.addFieldValidation('username', rule().slug().build());
 engine.removeFieldValidation('phone', ValidationType.Required);
-engine.setFieldValidations('role', [{ type: ValidationType.Required }]);
+engine.setFieldValidations('role', rule().required().build());
 engine.clearFieldValidations('optionalField');
 engine.hasAsyncRules('avatar'); // boolean
 ```
@@ -112,28 +130,22 @@ The `ValiValid` engine has **zero React dependencies**. You can use it in any Ja
 <!-- LoginForm.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type LoginForm = { email: string; password: string };
 
 const form = ref<LoginForm>({ email: '', password: '' });
-const errors = ref<Partial<Record<keyof LoginForm, string | null>>>({});
+const errors = ref<Partial<Record<keyof LoginForm, string[] | null>>>({});
 const isSubmitting = ref(false);
 
 const engine = new ValiValid<LoginForm>([
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'password',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 8 },
-    ],
+    validations: rule().required().minLength(8).build(),
   },
 ]);
 
@@ -143,7 +155,7 @@ function handleChange(field: keyof LoginForm, value: string) {
   form.value = { ...form.value, [field]: value };
   errors.value = {
     ...errors.value,
-    [field]: engine.validateFieldSync(field, value),
+    [field]: engine.validateFieldSync(field, value),   // string[] | null
   };
 }
 
@@ -166,7 +178,7 @@ async function handleSubmit() {
       @input="handleChange('email', ($event.target as HTMLInputElement).value)"
       placeholder="Email"
     />
-    <p v-if="errors.email" style="color: red">{{ errors.email }}</p>
+    <p v-for="(msg, i) in errors.email" :key="i" style="color: red">{{ msg }}</p>
 
     <input
       type="password"
@@ -174,7 +186,7 @@ async function handleSubmit() {
       @input="handleChange('password', ($event.target as HTMLInputElement).value)"
       placeholder="Password"
     />
-    <p v-if="errors.password" style="color: red">{{ errors.password }}</p>
+    <p v-for="(msg, i) in errors.password" :key="i" style="color: red">{{ msg }}</p>
 
     <button type="submit" :disabled="!isValid || isSubmitting">Sign in</button>
   </form>
@@ -188,7 +200,7 @@ async function handleSubmit() {
 ```ts
 // validation.service.ts
 import { Injectable } from '@angular/core';
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type LoginForm = { email: string; password: string };
 
@@ -197,25 +209,19 @@ export class LoginValidationService {
   private engine = new ValiValid<LoginForm>([
     {
       field: 'email',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.Email },
-      ],
+      validations: rule().required().email().build(),
     },
     {
       field: 'password',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.MinLength, value: 8 },
-      ],
+      validations: rule().required().minLength(8).build(),
     },
   ]);
 
-  validateField(field: keyof LoginForm, value: string): string | null {
+  validateField(field: keyof LoginForm, value: string): string[] | null {
     return this.engine.validateFieldSync(field, value);
   }
 
-  validateAll(form: LoginForm): Partial<Record<keyof LoginForm, string | null>> {
+  validateAll(form: LoginForm): Partial<Record<keyof LoginForm, string[] | null>> {
     return this.engine.validateSync(form);
   }
 
@@ -241,7 +247,7 @@ import { LoginValidationService } from './validation.service';
         (ngModelChange)="onFieldChange('email', $event)"
         placeholder="Email"
       />
-      <p *ngIf="errors.email" style="color: red">{{ errors.email }}</p>
+      <p *ngFor="let msg of errors.email" style="color: red">{{ msg }}</p>
 
       <input
         type="password"
@@ -250,7 +256,7 @@ import { LoginValidationService } from './validation.service';
         (ngModelChange)="onFieldChange('password', $event)"
         placeholder="Password"
       />
-      <p *ngIf="errors.password" style="color: red">{{ errors.password }}</p>
+      <p *ngFor="let msg of errors.password" style="color: red">{{ msg }}</p>
 
       <button type="submit" [disabled]="!isValid">Sign in</button>
     </form>
@@ -258,7 +264,7 @@ import { LoginValidationService } from './validation.service';
 })
 export class LoginComponent {
   form = { email: '', password: '' };
-  errors: Partial<Record<string, string | null>> = {};
+  errors: Partial<Record<string, string[] | null>> = {};
 
   constructor(private validator: LoginValidationService) {}
 
@@ -288,7 +294,7 @@ export class LoginComponent {
 ### Node.js (server-side validation)
 
 ```ts
-import { ValiValid, ValidationType, setLocale } from 'vali-valid';
+import { ValiValid, rule, setLocale } from 'vali-valid';
 
 setLocale('en');
 
@@ -297,26 +303,16 @@ type CreateUserDto = { username: string; email: string; age: number };
 const validator = new ValiValid<CreateUserDto>([
   {
     field: 'username',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 3 },
-      { type: ValidationType.AlphaNumeric },
-    ],
+    validations: rule().required().minLength(3).alphaNumeric().build(),
   },
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'age',
     isNumber: true,
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.NumberRange, value: [18, 120] },
-    ],
+    validations: rule().required().numberRange(18, 120).build(),
   },
 ]);
 
@@ -333,7 +329,7 @@ export function validateCreateUser(body: unknown) {
 ## Standalone example
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type OrderForm = {
   email: string;
@@ -344,22 +340,16 @@ type OrderForm = {
 const validator = new ValiValid<OrderForm>([
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'quantity',
     isNumber: true,
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.NumberRange, value: [1, 100] },
-      { type: ValidationType.Integer },
-    ],
+    validations: rule().required().numberRange(1, 100).integer().build(),
   },
   {
     field: 'voucher',
+    // traditional form — also valid
     validations: [
       {
         type: ValidationType.AsyncPattern,

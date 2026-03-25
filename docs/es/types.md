@@ -16,6 +16,8 @@ type FieldValidationConfig<T> = {
   validations: ValidationsConfig[];  // Requerido — array de reglas
   isNumber?: boolean;   // Elimina chars no numéricos, convierte a Number entero
   isDecimal?: boolean;  // Convierte directamente a Number decimal
+  transform?: (value: any) => any;  // Transforma el valor antes de validar
+  watchFields?: string[];           // Campos que al cambiar disparan re-validación de este campo
 };
 ```
 
@@ -29,23 +31,23 @@ type BuilderValidationConfig<T> = FieldValidationConfig<T>[];
 
 ### `FormErrors<T>`
 
-Mapa de nombres de campos a mensajes de error.
+Mapa de nombres de campos a mensajes de error. En v3 cada campo retorna **todos** los errores como un array.
 
 ```ts
 type FormErrors<T> = {
-  [key in keyof T]?: string | null;
+  [key in keyof T]?: string[] | null;
 };
 ```
 
 | Valor | Significado |
 |-------|-------------|
-| `string` | Validación fallida — mostrar este mensaje |
+| `string[]` | Validación fallida — array con todos los mensajes de error |
 | `null` | Campo validado correctamente |
 | `undefined` | Campo aún no validado |
 
 ### `ValidationsConfig`
 
-Unión de los 43 tipos de configuración de validación. Úsala para tipar arrays de reglas dinámicas.
+Unión de los 50 tipos de configuración de validación. Úsala para tipar arrays de reglas dinámicas.
 
 ```ts
 import { ValidationsConfig, ValidationType } from 'vali-valid';
@@ -100,6 +102,8 @@ type SetState<T> = (value: T | ((prevState: T) => T)) => void;
 interface UseValiValidOptions<T extends Record<string, any>> {
   initial: T;
   validations?: FieldValidationConfig<T>[];
+  validateOnSubmit?: boolean;  // solo valida después del primer submit
+  debounceMs?: number;         // debounce para validaciones async (ms)
 }
 ```
 
@@ -107,13 +111,23 @@ interface UseValiValidOptions<T extends Record<string, any>> {
 
 ```ts
 interface UseValiValidReturn<T extends Record<string, any>> {
+  // Estado
   form: T;
   errors: FormErrors<T>;
   isValid: boolean;
   isValidating: boolean;
+  isSubmitted: boolean;    // true después del primer handleSubmit
+  submitCount: number;     // número de intentos de submit
+
+  // Acciones
   handleChange: (field: keyof T, value: any) => void;
+  handleSubmit: (onSubmit: (data: T) => Promise<void>) => () => Promise<void>;
   validate: () => Promise<FormErrors<T>>;
   reset: (initial?: Partial<T>) => void;
+  setServerErrors: (errors: Partial<Record<keyof T, string[]>>) => void;
+  setValues: (values: Partial<T>) => void;
+
+  // Gestión dinámica de reglas
   addFieldValidation: (field: keyof T, validations: ValidationsConfig[]) => void;
   removeFieldValidation: (field: keyof T, type: ValidationType) => void;
   setFieldValidations: (field: keyof T, validations: ValidationsConfig[]) => void;
@@ -127,7 +141,7 @@ interface UseValiValidReturn<T extends Record<string, any>> {
 
 ### `ValidationType`
 
-Los 43 tipos de validación. Consulta [validators.md](./validators.md) para detalles de cada uno.
+Los 50 tipos de validación. Consulta [validators.md](./validators.md) para detalles de cada uno.
 
 ```ts
 enum ValidationType {
@@ -148,11 +162,14 @@ enum ValidationType {
   FileType, FileSize, FileDimensions,
   ImageAspectRatio, ImageMinDimensions, ImageMaxDimensions,
 
-  // Cross-field (2 tipos)
-  MatchField, RequiredIf,
+  // Cross-field (3 tipos)
+  MatchField, RequiredIf, DateRange,
 
   // Asíncrono (1 tipo)
   AsyncPattern,
+
+  // Nuevos en v3 (6 tipos)
+  NotOneOf, IPv6, MACAddress, DataURI, MimeType, ArrayItems,
 }
 ```
 
@@ -203,7 +220,7 @@ enum FileSize {
 
 ---
 
-## Referencia de tipos de configuración de validación
+## Los 50 tipos de configuración de validación
 
 Todos los tipos siguen este patrón:
 
@@ -260,3 +277,10 @@ type ValidationConfigXxx = {
 | `ValidationConfigMatchField` | `field: string` |
 | `ValidationConfigRequiredIf` | `condition: (form: Record<string, any>) => boolean` |
 | `ValidationConfigAsyncPattern` | `asyncFn: (value: any, form: Record<string, any>) => Promise<boolean>` |
+| `ValidationConfigNotOneOf` | `value: any[]` |
+| `ValidationConfigIPv6` | — |
+| `ValidationConfigMACAddress` | — |
+| `ValidationConfigDataURI` | — |
+| `ValidationConfigMimeType` | `value: string[]` |
+| `ValidationConfigDateRange` | `startField: string`, `endField: string` |
+| `ValidationConfigArrayItems` | `validations: ValidationsConfig[]` |

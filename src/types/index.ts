@@ -1,161 +1,78 @@
-import {
-    ValidationConfigRequired,
-    ValidationConfigMinLength,
-    ValidationConfigMaxLength,
-    ValidationConfigDigitsOnly,
-    ValidationConfigNumberRange,
-    ValidationConfigEmail,
-    ValidationConfigUrl,
-    ValidationConfigFileSize,
-    ValidationConfigFileType,
-    ValidationConfigFileDimensions,
-    ValidationConfigPattern,
-    ValidationConfigDateFormat,
-    ValidationConfigNumberPositive,
-    ValidationConfigNumberNegative,
-    ValidationConfigAlpha,
-    ValidationConfigAlphaNumeric,
-    ValidationConfigLowerCase,
-    ValidationConfigUpperCase,
-    ValidationConfigAsyncPattern,
-    ValidationConfigExactLength,
-    ValidationConfigNoWhitespace,
-    ValidationConfigContains,
-    ValidationConfigStartsWith,
-    ValidationConfigEndsWith,
-    ValidationConfigSlug,
-    ValidationConfigPasswordStrength,
-    ValidationConfigHexColor,
-    ValidationConfigIPv4,
-    ValidationConfigUUID,
-    ValidationConfigJson,
-    ValidationConfigPhone,
-    ValidationConfigCreditCard,
-    ValidationConfigInteger,
-    ValidationConfigMultipleOf,
-    ValidationConfigMinDate,
-    ValidationConfigMaxDate,
-    ValidationConfigFutureDate,
-    ValidationConfigPastDate,
-    ValidationConfigMatchField,
-    ValidationConfigRequiredIf,
-    ValidationConfigImageAspectRatio,
-    ValidationConfigImageMinDimensions,
-    ValidationConfigImageMaxDimensions,
-    ValidationConfigGreaterThan,
-    ValidationConfigLessThan,
-    ValidationConfigPrecision,
-    ValidationConfigDateAfter,
-    ValidationConfigDateBefore,
-    ValidationConfigOneOf,
-    ValidationConfigNotMatchField,
-    ValidationConfigRequiredUnless,
-    ValidationConfigArrayMinLength,
-    ValidationConfigArrayMaxLength,
-    ValidationConfigArrayUnique,
-    ValidationConfigArrayContains,
-    ValidationConfigTime,
-    ValidationConfigNoHTML,
-    ValidationConfigIBAN,
-    ValidationConfigPostalCode,
-    ValidationConfigLatitude,
-    ValidationConfigLongitude,
-    ValidationConfigSemVer,
-    ValidationConfigBase64,
-} from '../validation/Validators';
-
+/** React setState-compatible setter type. */
 export type SetState<T> = (value: T | ((prevState: T) => T)) => void;
 
-export type ValidationsConfig =
-    | ValidationConfigRequired
-    | ValidationConfigMinLength
-    | ValidationConfigMaxLength
-    | ValidationConfigDigitsOnly
-    | ValidationConfigNumberRange
-    | ValidationConfigEmail
-    | ValidationConfigUrl
-    | ValidationConfigFileSize
-    | ValidationConfigFileType
-    | ValidationConfigFileDimensions
-    | ValidationConfigPattern
-    | ValidationConfigDateFormat
-    | ValidationConfigNumberPositive
-    | ValidationConfigNumberNegative
-    | ValidationConfigAlpha
-    | ValidationConfigAlphaNumeric
-    | ValidationConfigLowerCase
-    | ValidationConfigUpperCase
-    | ValidationConfigAsyncPattern
-    | ValidationConfigExactLength
-    | ValidationConfigNoWhitespace
-    | ValidationConfigContains
-    | ValidationConfigStartsWith
-    | ValidationConfigEndsWith
-    | ValidationConfigSlug
-    | ValidationConfigPasswordStrength
-    | ValidationConfigHexColor
-    | ValidationConfigIPv4
-    | ValidationConfigUUID
-    | ValidationConfigJson
-    | ValidationConfigPhone
-    | ValidationConfigCreditCard
-    | ValidationConfigInteger
-    | ValidationConfigMultipleOf
-    | ValidationConfigMinDate
-    | ValidationConfigMaxDate
-    | ValidationConfigFutureDate
-    | ValidationConfigPastDate
-    | ValidationConfigMatchField
-    | ValidationConfigRequiredIf
-    | ValidationConfigImageAspectRatio
-    | ValidationConfigImageMinDimensions
-    | ValidationConfigImageMaxDimensions
-    | ValidationConfigGreaterThan
-    | ValidationConfigLessThan
-    | ValidationConfigPrecision
-    | ValidationConfigDateAfter
-    | ValidationConfigDateBefore
-    | ValidationConfigOneOf
-    | ValidationConfigNotMatchField
-    | ValidationConfigRequiredUnless
-    | ValidationConfigArrayMinLength
-    | ValidationConfigArrayMaxLength
-    | ValidationConfigArrayUnique
-    | ValidationConfigArrayContains
-    | ValidationConfigTime
-    | ValidationConfigNoHTML
-    | ValidationConfigIBAN
-    | ValidationConfigPostalCode
-    | ValidationConfigLatitude
-    | ValidationConfigLongitude
-    | ValidationConfigSemVer
-    | ValidationConfigBase64;
+/**
+ * Options for the ValiValid engine constructor.
+ */
+export type ValiValidOptions = {
+    /** 'all' (default) returns all errors per field; 'firstError' stops at the first. */
+    criteriaMode?: 'all' | 'firstError';
+    /** Per-instance locale override (e.g. 'en', 'es', 'fr'). Safe for SSR. */
+    locale?: string;
+    /**
+     * Per-async-rule timeout in milliseconds.
+     * When > 0, each individual async rule is raced against a timer; if the rule
+     * does not resolve within `asyncTimeout` ms it is treated as passing (no error).
+     * Default: 0 (no timeout).
+     */
+    asyncTimeout?: number;
+};
 
+export type { ValidationsConfig } from '../validation/Validators';
+
+/**
+ * Configuration for a single field's validation rules.
+ * @template T - Form data shape
+ * @example
+ * const config: FieldValidationConfig<MyForm> = {
+ *   field: 'email',
+ *   validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }],
+ * };
+ */
 export type FieldValidationConfig<T> = {
     field: keyof T;
-    validations: ValidationsConfig[];
+    validations: import('../validation/Validators').ValidationsConfig[];
     isNumber?: boolean;
     isDecimal?: boolean;
+    transform?: (value: any) => any;
+    watchFields?: string[];
 };
 
 export type BuilderValidationConfig<T> = FieldValidationConfig<T>[];
 
+/**
+ * Internal representation of a synchronous validation rule stored in the engine.
+ * Created by `ValiValid.addValidation()` — not intended for direct use.
+ */
 export type SyncRule<T> = {
     type: string;
     field: keyof T;
-    message: string;
-    validate: (value: any) => boolean;
+    message: string | (() => string);
+    validate: (value: any, form?: any) => boolean;
 };
 
+/**
+ * Internal representation of an asynchronous validation rule stored in the engine.
+ * Created by `ValiValid.addValidation()` — not intended for direct use.
+ */
 export type AsyncRule<T> = {
     type: string;
     field: keyof T;
-    message: string;
+    message: string | (() => string);
     asyncFn: (value: any, form: T) => Promise<boolean>;
 };
 
+/**
+ * Per-field error state:
+ * - `undefined` — field has not been validated yet
+ * - `null` — field is valid
+ * - `string[]` — field has errors (the array contains error messages)
+ *
+ * When `criteriaMode: 'firstError'` is set on the engine, each array
+ * contains at most 1 element.
+ */
 export type FormErrors<T> = {
-    [key in keyof T]?: string | null;
+    [key in keyof T]?: string[] | null;
 };
 
 export enum TypeFile {

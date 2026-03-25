@@ -1,5 +1,7 @@
 # Primeros pasos
 
+> **Nota v3:** `FormErrors<T>` ahora retorna `string[] | null` por campo (todos los errores, no solo el primero). Actualiza cualquier JSX que renderice `errors.campo` directamente — consulta [Mostrar errores](#mostrar-errores) más abajo. El hook también expone un helper `handleSubmit` y una opción `validateOnSubmit`.
+
 ## Requisitos
 
 - React **≥ 16.8** (soporte de hooks)
@@ -34,8 +36,10 @@ type RegisterForm = {
 
 ### 2. Configura el hook
 
+> **Nuevo en v3:** el builder fluido `rule()` es la sintaxis recomendada. El array de objetos planos funciona perfectamente y está completamente soportado — ambas formas son válidas.
+
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid } from 'vali-valid';
 
 const {
   form,
@@ -43,6 +47,7 @@ const {
   isValid,
   isValidating,
   handleChange,
+  handleSubmit,
   validate,
   reset,
 } = useValiValid<RegisterForm>({
@@ -55,37 +60,19 @@ const {
   validations: [
     {
       field: 'nombre',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.MinLength, value: 2 },
-        { type: ValidationType.MaxLength, value: 50 },
-        { type: ValidationType.Alpha },
-      ],
+      validations: rule().required().minLength(2).maxLength(50).alpha().build(),
     },
     {
       field: 'email',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.Email },
-      ],
+      validations: rule().required().email().build(),
     },
     {
       field: 'password',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.PasswordStrength },
-      ],
+      validations: rule().required().passwordStrength().build(),
     },
     {
       field: 'confirmarPassword',
-      validations: [
-        { type: ValidationType.Required },
-        {
-          type: ValidationType.MatchField,
-          field: 'password',
-          message: 'Las contraseñas no coinciden.',
-        },
-      ],
+      validations: rule().required().matchField('password', 'Las contraseñas no coinciden.').build(),
     },
   ],
 });
@@ -95,22 +82,18 @@ const {
 
 ```tsx
 export function FormularioRegistro() {
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const errores = await validate();
-    if (Object.values(errores).every((e) => !e)) {
-      console.log('Enviar:', form);
-    }
-  };
+  const onSubmit = handleSubmit(async (data) => {
+    console.log('Enviar:', data);
+  });
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={onSubmit}>
       <input
         value={form.nombre}
         onChange={(e) => handleChange('nombre', e.target.value)}
         placeholder="Nombre"
       />
-      {errors.nombre && <span className="error">{errors.nombre}</span>}
+      {errors.nombre?.map((msg, i) => <span key={i} className="error">{msg}</span>)}
 
       <input
         type="email"
@@ -118,7 +101,7 @@ export function FormularioRegistro() {
         onChange={(e) => handleChange('email', e.target.value)}
         placeholder="Email"
       />
-      {errors.email && <span className="error">{errors.email}</span>}
+      {errors.email?.map((msg, i) => <span key={i} className="error">{msg}</span>)}
 
       <input
         type="password"
@@ -126,7 +109,7 @@ export function FormularioRegistro() {
         onChange={(e) => handleChange('password', e.target.value)}
         placeholder="Contraseña"
       />
-      {errors.password && <span className="error">{errors.password}</span>}
+      {errors.password?.map((msg, i) => <span key={i} className="error">{msg}</span>)}
 
       <input
         type="password"
@@ -134,7 +117,7 @@ export function FormularioRegistro() {
         onChange={(e) => handleChange('confirmarPassword', e.target.value)}
         placeholder="Confirmar contraseña"
       />
-      {errors.confirmarPassword && <span className="error">{errors.confirmarPassword}</span>}
+      {errors.confirmarPassword?.map((msg, i) => <span key={i} className="error">{msg}</span>)}
 
       <button type="submit" disabled={!isValid || isValidating}>
         {isValidating ? 'Validando…' : 'Registrarse'}
@@ -142,6 +125,39 @@ export function FormularioRegistro() {
     </form>
   );
 }
+```
+
+---
+
+## Mostrar errores
+
+En v3, cada campo puede tener **múltiples errores simultáneos**. `errors.campo` es `string[] | null | undefined`.
+
+```tsx
+// Mostrar todos los errores
+{errors.email?.map((msg, i) => <p key={i} className="error">{msg}</p>)}
+
+// Mostrar solo el primero
+{errors.email?.[0] && <p className="error">{errors.email[0]}</p>}
+```
+
+---
+
+## Validar solo al enviar (`validateOnSubmit`)
+
+Usa `validateOnSubmit: true` para suprimir los errores en tiempo real hasta que el usuario intente enviar el formulario por primera vez.
+
+```tsx
+const { form, errors, handleChange, handleSubmit, isSubmitted } =
+  useValiValid<RegisterForm>({
+    initial: { ... },
+    validateOnSubmit: true,   // los errores no se muestran hasta el primer submit
+    validations: [...],
+  });
+
+const onSubmit = handleSubmit(async (data) => {
+  await api.register(data);
+});
 ```
 
 ---
@@ -154,10 +170,7 @@ Usa `isNumber` o `isDecimal` para sanitizar automáticamente valores numéricos:
 {
   field: 'edad',
   isNumber: true,        // elimina caracteres no numéricos, convierte a entero
-  validations: [
-    { type: ValidationType.Required },
-    { type: ValidationType.NumberRange, value: [1, 120] },
-  ],
+  validations: rule().required().numberRange(1, 120).build(),
 }
 ```
 
@@ -165,10 +178,7 @@ Usa `isNumber` o `isDecimal` para sanitizar automáticamente valores numéricos:
 {
   field: 'precio',
   isDecimal: true,       // convierte directamente a Number decimal
-  validations: [
-    { type: ValidationType.Required },
-    { type: ValidationType.NumberPositive },
-  ],
+  validations: rule().required().numberPositive().build(),
 }
 ```
 
@@ -177,7 +187,7 @@ Usa `isNumber` o `isDecimal` para sanitizar automáticamente valores numéricos:
 ## Carga de archivos
 
 ```tsx
-import { useValiValid, ValidationType, TypeFile, FileSize } from 'vali-valid';
+import { rule, useValiValid, TypeFile, FileSize } from 'vali-valid';
 
 type SubirArchivoForm = { avatar: File | null };
 
@@ -186,16 +196,12 @@ const { form, errors, handleChange } = useValiValid<SubirArchivoForm>({
   validations: [
     {
       field: 'avatar',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.FileType, value: [TypeFile.JPG, TypeFile.PNG] },
-        { type: ValidationType.FileSize, value: FileSize['2MB'] },
-        {
-          type: ValidationType.ImageMinDimensions,
-          value: { width: 200, height: 200 },
-          message: 'El avatar debe ser de al menos 200×200 px.',
-        },
-      ],
+      validations: rule()
+        .required()
+        .fileType([TypeFile.JPG, TypeFile.PNG])
+        .fileSize(FileSize['2MB'])
+        .imageMinDimensions({ width: 200, height: 200 }, 'El avatar debe ser de al menos 200×200 px.')
+        .build(),
     },
   ],
 });
@@ -206,7 +212,7 @@ const { form, errors, handleChange } = useValiValid<SubirArchivoForm>({
   accept="image/jpeg,image/png"
   onChange={(e) => handleChange('avatar', e.target.files?.[0] ?? null)}
 />
-{errors.avatar && <span>{errors.avatar}</span>}
+{errors.avatar?.map((msg, i) => <span key={i}>{msg}</span>)}
 ```
 
 ---
@@ -217,3 +223,5 @@ const { form, errors, handleChange } = useValiValid<SubirArchivoForm>({
 - [Validación asíncrona →](./async.md)
 - [Reglas dinámicas →](./dynamic.md)
 - [API completa del hook →](./hook.md)
+- [Builder fluido →](./builder.md)
+- [Ejemplos de código →](../../examples/)

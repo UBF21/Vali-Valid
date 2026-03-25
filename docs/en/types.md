@@ -14,17 +14,45 @@ type FieldValidationConfig<T> = {
   validations: ValidationsConfig[];  // Required — array of rules
   isNumber?: boolean;   // Strip non-numeric chars → integer Number
   isDecimal?: boolean;  // Convert directly → decimal Number
+  // v3 additions:
+  transform?: (value: any) => any;  // Transform value before validation runs
+  watchFields?: string[];           // Re-validate this field when any of these fields change
 };
+```
+
+`transform` runs before any validator sees the value and does not mutate the stored form state. For example, trimming whitespace:
+
+```ts
+{
+  field: 'username',
+  transform: (v) => (typeof v === 'string' ? v.trim() : v),
+  validations: [{ type: ValidationType.Required }],
+}
+```
+
+`watchFields` triggers re-validation of the current field whenever the listed fields change. Useful for cross-field dependencies:
+
+```ts
+{
+  field: 'confirmPassword',
+  watchFields: ['password'],   // re-validates confirmPassword when password changes
+  validations: [
+    { type: ValidationType.MatchField, field: 'password' },
+  ],
+}
 ```
 
 ### `FormErrors<T>`
 
 ```ts
-type FormErrors<T> = { [key in keyof T]?: string | null };
-// string    → validation failed, show this message
-// null      → field validated and passed
+// v3 — each field holds ALL its errors, not just the first
+type FormErrors<T> = { [key in keyof T]?: string[] | null };
+// string[]  → one or more validation messages
+// null      → field validated and passed (all rules passed)
 // undefined → field not yet validated
 ```
+
+> **Migration from v2:** Replace `errors.field && <span>{errors.field}</span>` with `errors.field?.map((msg, i) => <span key={i}>{msg}</span>)`. If you only want the first message, use `errors.field?.[0]`.
 
 ### `SyncRule<T>` / `AsyncRule<T>`
 
@@ -56,6 +84,9 @@ type AsyncRule<T> = {
 interface UseValiValidOptions<T extends Record<string, any>> {
   initial: T;
   validations?: FieldValidationConfig<T>[];
+  // v3 additions:
+  validateOnSubmit?: boolean;  // Only validate after first handleSubmit call
+  debounceMs?: number;         // Debounce async validation (milliseconds)
 }
 ```
 
@@ -63,13 +94,25 @@ interface UseValiValidOptions<T extends Record<string, any>> {
 
 ```ts
 interface UseValiValidReturn<T extends Record<string, any>> {
+  // State
   form: T;
-  errors: FormErrors<T>;
+  errors: FormErrors<T>;           // v3: string[] | null per field
   isValid: boolean;
   isValidating: boolean;
+  // v3 additions:
+  isSubmitted: boolean;            // true after the first handleSubmit call
+  submitCount: number;             // number of submit attempts
+
+  // Actions
   handleChange: (field: keyof T, value: any) => void;
   validate: () => Promise<FormErrors<T>>;
   reset: (initial?: Partial<T>) => void;
+  // v3 additions:
+  handleSubmit: (onSubmit: (data: T) => Promise<void>) => () => Promise<void>;
+  setServerErrors: (errors: Partial<FormErrors<T>>) => void;
+  setValues: (values: Partial<T>) => void;
+
+  // Dynamic rule management
   addFieldValidation: (field: keyof T, validations: ValidationsConfig[]) => void;
   removeFieldValidation: (field: keyof T, type: ValidationType) => void;
   setFieldValidations: (field: keyof T, validations: ValidationsConfig[]) => void;
@@ -81,23 +124,33 @@ interface UseValiValidReturn<T extends Record<string, any>> {
 
 ## Enums
 
-### `ValidationType` — 43 entries
+### `ValidationType` — 50 entries
 
 ```ts
 enum ValidationType {
-  // String (23)
+  // String (26)
   Required, MinLength, MaxLength, ExactLength,
   Email, Url, Alpha, AlphaNumeric, LowerCase, UpperCase,
   NoWhitespace, Contains, StartsWith, EndsWith,
   Slug, PasswordStrength, HexColor, IPv4, UUID, Json, Phone, CreditCard, Pattern,
+  // v3 string additions:
+  IPv6, MACAddress, DataURI,
   // Numeric (6)
   DigitsOnly, NumberRange, NumberPositive, NumberNegative, Integer, MultipleOf,
   // Date (5)
   DateFormat, MinDate, MaxDate, FutureDate, PastDate,
-  // File (6)
+  // File (7)
   FileType, FileSize, FileDimensions, ImageAspectRatio, ImageMinDimensions, ImageMaxDimensions,
-  // Cross-field (2)
+  // v3 file addition:
+  MimeType,
+  // Cross-field (3)
   MatchField, RequiredIf,
+  // v3 cross-field addition:
+  DateRange,
+  // Array (1 new in v3)
+  ArrayItems,
+  // Enum (1 new in v3)
+  NotOneOf,
   // Async (1)
   AsyncPattern,
 }
@@ -137,7 +190,7 @@ FileSize['100MB'] // 104857600
 
 ---
 
-## All 43 validation config types
+## All 50 validation config types
 
 | Type | Extra fields |
 |------|-------------|
@@ -184,3 +237,10 @@ FileSize['100MB'] // 104857600
 | `ValidationConfigMatchField` | `field: string` |
 | `ValidationConfigRequiredIf` | `condition: (form: Record<string, any>) => boolean` |
 | `ValidationConfigAsyncPattern` | `asyncFn: (value: any, form: Record<string, any>) => Promise<boolean>` |
+| `ValidationConfigNotOneOf` | `value: any[]` |
+| `ValidationConfigIPv6` | — |
+| `ValidationConfigMACAddress` | — |
+| `ValidationConfigDataURI` | — |
+| `ValidationConfigMimeType` | `value: string[]` |
+| `ValidationConfigDateRange` | `startField: string`, `endField: string` |
+| `ValidationConfigArrayItems` | `rules: ValidationsConfig[]` |

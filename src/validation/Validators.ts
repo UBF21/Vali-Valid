@@ -89,6 +89,27 @@ export enum ValidationType {
     Longitude = 'Longitude',
     SemVer = 'SemVer',
     Base64 = 'Base64',
+
+    // v3 — new types
+    NotOneOf = 'NotOneOf',
+    IPv6 = 'IPv6',
+    MACAddress = 'MACAddress',
+    DataURI = 'DataURI',
+    MimeType = 'MimeType',
+    DateRange = 'DateRange',
+    ArrayItems = 'ArrayItems',
+
+    // v4 — new types
+    AlphaDash = 'AlphaDash',
+    NotEmpty = 'NotEmpty',
+    JWT = 'JWT',
+    Finite = 'Finite',
+    Port = 'Port',
+    GreaterThanOrEqual = 'GreaterThanOrEqual',
+    LessThanOrEqual = 'LessThanOrEqual',
+    DateAfterField = 'DateAfterField',
+    DateBeforeField = 'DateBeforeField',
+    ArrayExactLength = 'ArrayExactLength',
 }
 
 // --- Existing types ---
@@ -157,7 +178,7 @@ export type ValidationConfigFileDimensions = {
 
 export type ValidationConfigPattern = {
     type: ValidationType.Pattern;
-    value: (value: any) => boolean;
+    value: RegExp | ((value: any) => boolean);
     message?: string;
 };
 
@@ -244,6 +265,7 @@ export type ValidationConfigIPv4 = {
 
 export type ValidationConfigUUID = {
     type: ValidationType.UUID;
+    version?: 1 | 3 | 4 | 5;   // NEW — optional, defaults to v4
     message?: string;
 };
 
@@ -456,3 +478,193 @@ export type ValidationConfigBase64 = {
     type: ValidationType.Base64;
     message?: string;
 };
+
+// --- v3 new config types ---
+
+export type ValidationConfigNotOneOf = {
+    type: ValidationType.NotOneOf;
+    value: any[];
+    message?: string;
+};
+
+export type ValidationConfigIPv6 = {
+    type: ValidationType.IPv6;
+    message?: string;
+};
+
+export type ValidationConfigMACAddress = {
+    type: ValidationType.MACAddress;
+    message?: string;
+};
+
+export type ValidationConfigDataURI = {
+    type: ValidationType.DataURI;
+    message?: string;
+};
+
+export type ValidationConfigMimeType = {
+    type: ValidationType.MimeType;
+    value: string[];
+    message?: string;
+};
+
+export type ValidationConfigDateRange = {
+    type: ValidationType.DateRange;
+    startField: string;
+    endField: string;
+    message?: string;
+};
+
+export type ValidationConfigArrayItems = {
+    type: ValidationType.ArrayItems;
+    validations: ValidationsConfig[];
+    message?: string;
+};
+
+// --- v4 new config types ---
+
+export type ValidationConfigAlphaDash = { type: ValidationType.AlphaDash; message?: string; };
+export type ValidationConfigNotEmpty = { type: ValidationType.NotEmpty; message?: string; };
+export type ValidationConfigJWT = { type: ValidationType.JWT; message?: string; };
+export type ValidationConfigFinite = { type: ValidationType.Finite; message?: string; };
+export type ValidationConfigPort = { type: ValidationType.Port; message?: string; };
+export type ValidationConfigGreaterThanOrEqual = { type: ValidationType.GreaterThanOrEqual; value: number; message?: string; };
+export type ValidationConfigLessThanOrEqual = { type: ValidationType.LessThanOrEqual; value: number; message?: string; };
+export type ValidationConfigDateAfterField = { type: ValidationType.DateAfterField; field: string; message?: string; };
+export type ValidationConfigDateBeforeField = { type: ValidationType.DateBeforeField; field: string; message?: string; };
+export type ValidationConfigArrayExactLength = { type: ValidationType.ArrayExactLength; value: number; message?: string; };
+
+// --- Synthetic builder types ---
+export type ValidationConfigNot = {
+  type: '__not__';
+  message?: string;
+  value: (value: any) => boolean;
+};
+export type ValidationConfigIf = {
+  type: '__if__';
+  message?: string;
+  condition: (form: any) => boolean;
+  thenBranch: (value: any) => boolean;
+  elseBranch?: (value: any) => boolean;
+};
+export type ValidationConfigOptional = {
+  type: '__optional__';
+};
+export type ValidationConfigNullable = {
+  type: '__nullable__';
+};
+export type ValidationConfigBail = {
+  type: '__bail__';
+};
+
+export type ValidationConfigOr = {
+  type: '__or__';
+  message?: string;
+  value: (val: any) => boolean;
+};
+
+/**
+ * Type-safe discriminant guard for ValidationsConfig.
+ * @example
+ *   if (isValidationConfig(cfg, ValidationType.UUID)) {
+ *       // cfg.version is safely accessible here
+ *   }
+ */
+export function isValidationConfig<T extends string>(
+    cfg: { type: string },
+    type: T
+): cfg is { type: T } & Record<string, unknown> {
+    return cfg.type === type;
+}
+
+/**
+ * Discriminated union of all supported validation rule configs.
+ * Pass an array of these to `FieldValidationConfig.validations`.
+ */
+export type ValidationsConfig =
+    | ValidationConfigRequired
+    | ValidationConfigMinLength
+    | ValidationConfigMaxLength
+    | ValidationConfigDigitsOnly
+    | ValidationConfigNumberRange
+    | ValidationConfigEmail
+    | ValidationConfigUrl
+    | ValidationConfigFileSize
+    | ValidationConfigFileType
+    | ValidationConfigFileDimensions
+    | ValidationConfigPattern
+    | ValidationConfigDateFormat
+    | ValidationConfigNumberPositive
+    | ValidationConfigNumberNegative
+    | ValidationConfigAlpha
+    | ValidationConfigAlphaNumeric
+    | ValidationConfigLowerCase
+    | ValidationConfigUpperCase
+    | ValidationConfigAsyncPattern
+    | ValidationConfigExactLength
+    | ValidationConfigNoWhitespace
+    | ValidationConfigContains
+    | ValidationConfigStartsWith
+    | ValidationConfigEndsWith
+    | ValidationConfigSlug
+    | ValidationConfigPasswordStrength
+    | ValidationConfigHexColor
+    | ValidationConfigIPv4
+    | ValidationConfigUUID
+    | ValidationConfigJson
+    | ValidationConfigPhone
+    | ValidationConfigCreditCard
+    | ValidationConfigInteger
+    | ValidationConfigMultipleOf
+    | ValidationConfigMinDate
+    | ValidationConfigMaxDate
+    | ValidationConfigFutureDate
+    | ValidationConfigPastDate
+    | ValidationConfigMatchField
+    | ValidationConfigRequiredIf
+    | ValidationConfigImageAspectRatio
+    | ValidationConfigImageMinDimensions
+    | ValidationConfigImageMaxDimensions
+    | ValidationConfigGreaterThan
+    | ValidationConfigLessThan
+    | ValidationConfigPrecision
+    | ValidationConfigDateAfter
+    | ValidationConfigDateBefore
+    | ValidationConfigOneOf
+    | ValidationConfigNotMatchField
+    | ValidationConfigRequiredUnless
+    | ValidationConfigArrayMinLength
+    | ValidationConfigArrayMaxLength
+    | ValidationConfigArrayUnique
+    | ValidationConfigArrayContains
+    | ValidationConfigTime
+    | ValidationConfigNoHTML
+    | ValidationConfigIBAN
+    | ValidationConfigPostalCode
+    | ValidationConfigLatitude
+    | ValidationConfigLongitude
+    | ValidationConfigSemVer
+    | ValidationConfigBase64
+    | ValidationConfigNotOneOf
+    | ValidationConfigIPv6
+    | ValidationConfigMACAddress
+    | ValidationConfigDataURI
+    | ValidationConfigMimeType
+    | ValidationConfigDateRange
+    | ValidationConfigArrayItems
+    | ValidationConfigAlphaDash
+    | ValidationConfigNotEmpty
+    | ValidationConfigJWT
+    | ValidationConfigFinite
+    | ValidationConfigPort
+    | ValidationConfigGreaterThanOrEqual
+    | ValidationConfigLessThanOrEqual
+    | ValidationConfigDateAfterField
+    | ValidationConfigDateBeforeField
+    | ValidationConfigArrayExactLength
+    | ValidationConfigOr
+    | ValidationConfigNot
+    | ValidationConfigIf
+    | ValidationConfigOptional
+    | ValidationConfigNullable
+    | ValidationConfigBail;

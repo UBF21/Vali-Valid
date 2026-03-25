@@ -20,10 +20,10 @@ ValiValid v2 lets you add, remove, replace, or clear validation rules at runtime
 Adds rules to a field **without removing** existing ones.
 
 ```tsx
+import { rule } from 'vali-valid';
+
 const enableStrengthCheck = () => {
-  addFieldValidation('password', [
-    { type: ValidationType.PasswordStrength },
-  ]);
+  addFieldValidation('password', rule().passwordStrength().build());
 };
 ```
 
@@ -34,11 +34,13 @@ const enableStrengthCheck = () => {
 Removes all rules of a specific `ValidationType`. Other types stay.
 
 ```tsx
+import { rule, ValidationType } from 'vali-valid';
+
 const makeOptional = (optional: boolean) => {
   if (optional) {
     removeFieldValidation('phone', ValidationType.Required);
   } else {
-    addFieldValidation('phone', [{ type: ValidationType.Required }]);
+    addFieldValidation('phone', rule().required().build());
   }
 };
 ```
@@ -50,18 +52,22 @@ const makeOptional = (optional: boolean) => {
 Replaces **all** existing rules for a field.
 
 ```tsx
+import { rule } from 'vali-valid';
+
 const applyRules = (role: 'admin' | 'user') => {
   if (role === 'admin') {
-    setFieldValidations('username', [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 6 },
-      { type: ValidationType.AlphaNumeric },
-    ]);
+    setFieldValidations('username', rule()
+      .required()
+      .minLength(6)
+      .alphaNumeric()
+      .build()
+    );
   } else {
-    setFieldValidations('username', [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 3 },
-    ]);
+    setFieldValidations('username', rule()
+      .required()
+      .minLength(3)
+      .build()
+    );
   }
 };
 ```
@@ -73,9 +79,12 @@ const applyRules = (role: 'admin' | 'user') => {
 Removes all rules from a field. Value stays in `form`.
 
 ```tsx
+import { rule, ValidationType } from 'vali-valid';
+
 const toggleSection = (enabled: boolean) => {
   if (enabled) {
     addFieldValidation('discount', [
+      // traditional form — also valid
       { type: ValidationType.Required },
       { type: ValidationType.NumberRange, value: [0, 100] },
     ]);
@@ -90,6 +99,8 @@ const toggleSection = (enabled: boolean) => {
 ## Multi-step form example
 
 ```tsx
+import { rule, useValiValid } from 'vali-valid';
+
 type CheckoutForm = {
   email: string;
   card: string;
@@ -107,10 +118,7 @@ function CheckoutWizard() {
     validations: [
       {
         field: 'email',
-        validations: [
-          { type: ValidationType.Required },
-          { type: ValidationType.Email },
-        ],
+        validations: rule().required().email().build(),
       },
     ],
   });
@@ -120,10 +128,7 @@ function CheckoutWizard() {
     if (Object.values(errs).some(Boolean)) return;
 
     clearFieldValidations('email');
-    setFieldValidations('card', [
-      { type: ValidationType.Required },
-      { type: ValidationType.CreditCard },
-    ]);
+    setFieldValidations('card', rule().required().creditCard().build());
     setStep('payment');
   };
 
@@ -163,9 +168,12 @@ function CheckoutWizard() {
 Rules run in **insertion order**. Validation stops at the first failure.
 
 ```ts
-addFieldValidation('email', [
-  { type: ValidationType.Required },      // checked 1st
-  { type: ValidationType.MinLength, value: 5 },
-  { type: ValidationType.Email },         // checked last
-]);
+import { rule } from 'vali-valid';
+
+addFieldValidation('email', rule()
+  .required()      // checked 1st
+  .minLength(5)
+  .email()         // checked last
+  .build()
+);
 ```

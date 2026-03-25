@@ -1,56 +1,68 @@
 {
   "name": "vali-valid",
-  "version": "2.1.2",
-  "description": "ValiValid — TypeScript form validation library for React. 63 built-in validators (string, numeric, date, file, array, geo, format, cross-field, async), a useValiValid hook with touchedFields, dirtyFields, handleBlur and validateOnBlur support, dynamic rule management at runtime, i18n (en/es), and a standalone ValiValid engine for server-side or non-React usage.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "version": "3.1.0",
+  "description": "ValiValid — framework-agnostic TypeScript validation engine. 74 built-in validators, fluent RuleBuilder, i18n (en/es/pt/fr/de). Use with vali-valid-react, vali-valid-vue, or vali-valid-svelte.",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.mjs",
+  "types": "dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.mts",
+      "import": "./dist/esm/index.mjs",
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./core": {
+      "types": "./dist/esm/core.d.mts",
+      "import": "./dist/esm/core.mjs",
+      "require": {
+        "types": "./dist/cjs/core.d.ts",
+        "default": "./dist/cjs/core.js"
+      }
+    }
+  },
   "files": [
     "dist",
-    "src",
-    "docs"
+    "README.md"
   ],
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
   },
   "keywords": [
-    "react",
-    "reactjs",
     "typescript",
     "validation",
-    "form",
     "form-validation",
-    "hook",
-    "async",
-    "async-validation",
-    "i18n",
     "validators",
     "schema",
     "field-validation",
-    "dynamic-rules",
-    "file-validation",
-    "image-validation",
-    "cross-field",
+    "rule-builder",
+    "i18n",
+    "async-validation",
+    "framework-agnostic",
     "vali-valid"
   ],
   "author": "Felipe Rafael Montenegro Morriberon <teabajo_ubf@hotmail.com> (https://fm-portafolio.netlify.app/)",
   "license": "MIT",
+  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "https://github.com/UBF21/Vali-Valid"
   },
-  "homepage": "https://github.com/UBF21/Vali-Valid#readme",
+  "homepage": "https://vali-valid-docs.netlify.app/",
   "bugs": {
     "url": "https://github.com/UBF21/Vali-Valid/issues"
   },
   "engines": {
     "node": ">=14.0.0"
   },
-  "peerDependencies": {
-    "react": ">=16.8.0"
-  },
   "devDependencies": {
-    "@types/react": "^18.3.28",
-    "typescript": "^5.5.4"
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.0"
   }
 }

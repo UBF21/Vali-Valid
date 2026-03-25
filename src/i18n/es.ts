@@ -86,4 +86,27 @@ export const es: Record<string, string | ((...args: any[]) => string)> = {
     longitude: 'El valor debe ser una longitud válida (-180 a 180).',
     semVer: 'Versión semántica no válida (se esperaba X.Y.Z).',
     base64: 'Cadena Base64 no válida.',
+    // v3 — nuevos validadores
+    notOneOf: (values: any[]) => `El valor no debe ser ninguno de: ${values.join(', ')}.`,
+    ipv6: 'Dirección IPv6 no válida.',
+    macAddress: 'Formato de dirección MAC no válido.',
+    dataURI: 'Formato Data URI no válido.',
+    mimeType: 'Tipo de archivo no permitido.',
+    dateRange: 'La fecha de inicio debe ser anterior o igual a la fecha de fin.',
+    arrayItems: 'Uno o más elementos del array no son válidos.',
+    // v4 — nuevos validadores
+    alphaDash: 'Solo se permiten letras, números, guiones bajos y guiones.',
+    notEmpty: 'El campo no puede estar en blanco ni contener solo espacios.',
+    jwt: 'Formato JWT no válido.',
+    finite: 'El valor debe ser un número finito.',
+    port: 'El valor debe ser un número de puerto válido (0–65535).',
+    greaterThanOrEqual: (n: number) => `El valor debe ser ≥ ${n}.`,
+    lessThanOrEqual: (n: number) => `El valor debe ser ≤ ${n}.`,
+    dateAfterField: (f: string) => `La fecha debe ser posterior a "${f}".`,
+    dateBeforeField: (f: string) => `La fecha debe ser anterior a "${f}".`,
+    arrayExactLength: (n: number) => `El array debe tener exactamente ${n} elementos.`,
+    // Reglas sintéticas
+    or: 'Al menos una de las condiciones debe cumplirse.',
+    not: 'El valor no debe satisfacer esta condición.',
+    if: 'La validación condicional falló.',
 };

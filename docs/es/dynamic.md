@@ -28,21 +28,22 @@ addFieldValidation(field: keyof T, validations: ValidationsConfig[]): void
 ### Ejemplo: agregar una regla según acción del usuario
 
 ```tsx
+import { rule, useValiValid, ValidationType } from 'vali-valid';
+
 function PasoPassword() {
   const { form, errors, handleChange, addFieldValidation } = useValiValid<Form>({
     initial: { password: '' },
     validations: [
       {
         field: 'password',
+        // forma tradicional — también funciona
         validations: [{ type: ValidationType.Required }],
       },
     ],
   });
 
   const activarVerificacion = () => {
-    addFieldValidation('password', [
-      { type: ValidationType.PasswordStrength },
-    ]);
+    addFieldValidation('password', rule().passwordStrength().build());
   };
 
   return (
@@ -73,11 +74,13 @@ removeFieldValidation(field: keyof T, type: ValidationType): void
 ### Ejemplo: hacer un campo opcional
 
 ```tsx
+import { rule, ValidationType } from 'vali-valid';
+
 const handleToggleOpcional = (esOpcional: boolean) => {
   if (esOpcional) {
     removeFieldValidation('telefono', ValidationType.Required);
   } else {
-    addFieldValidation('telefono', [{ type: ValidationType.Required }]);
+    addFieldValidation('telefono', rule().required().build());
   }
 };
 ```
@@ -95,18 +98,22 @@ setFieldValidations(field: keyof T, validations: ValidationsConfig[]): void
 ### Ejemplo: cambiar el perfil de validación según el rol del usuario
 
 ```tsx
+import { rule } from 'vali-valid';
+
 const aplicarReglas = (rol: 'admin' | 'usuario') => {
   if (rol === 'admin') {
-    setFieldValidations('username', [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 6 },
-      { type: ValidationType.AlphaNumeric },
-    ]);
+    setFieldValidations('username', rule()
+      .required()
+      .minLength(6)
+      .alphaNumeric()
+      .build()
+    );
   } else {
-    setFieldValidations('username', [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 3 },
-    ]);
+    setFieldValidations('username', rule()
+      .required()
+      .minLength(3)
+      .build()
+    );
   }
 };
 ```
@@ -124,14 +131,17 @@ clearFieldValidations(field: keyof T): void
 ### Ejemplo: deshabilitar validación para una sección opcional
 
 ```tsx
+import { rule } from 'vali-valid';
+
 const { clearFieldValidations, addFieldValidation } = useValiValid(…);
 
 const toggleSeccionOpcional = (activa: boolean) => {
   if (activa) {
-    addFieldValidation('descuento', [
-      { type: ValidationType.Required },
-      { type: ValidationType.NumberRange, value: [0, 100] },
-    ]);
+    addFieldValidation('descuento', rule()
+      .required()
+      .numberRange(0, 100)
+      .build()
+    );
   } else {
     clearFieldValidations('descuento');
   }
@@ -145,6 +155,9 @@ const toggleSeccionOpcional = (activa: boolean) => {
 La gestión dinámica es especialmente útil en formularios multi-paso donde cada paso activa reglas distintas.
 
 ```tsx
+import { useState } from 'react';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
+
 type FormularioPago = {
   email: string;
   tarjeta: string;
@@ -167,10 +180,7 @@ function WizardCheckout() {
       // Solo reglas de contacto activas al inicio
       {
         field: 'email',
-        validations: [
-          { type: ValidationType.Required },
-          { type: ValidationType.Email },
-        ],
+        validations: rule().required().email().build(),
       },
     ],
   });
@@ -180,10 +190,7 @@ function WizardCheckout() {
     if (Object.values(errs).some(Boolean)) return;
 
     clearFieldValidations('email');
-    setFieldValidations('tarjeta', [
-      { type: ValidationType.Required },
-      { type: ValidationType.CreditCard },
-    ]);
+    setFieldValidations('tarjeta', rule().required().creditCard().build());
     setPaso('pago');
   };
 
@@ -192,9 +199,10 @@ function WizardCheckout() {
     if (Object.values(errs).some(Boolean)) return;
 
     clearFieldValidations('tarjeta');
-    setFieldValidations('mensajeRegalo', [
-      { type: ValidationType.MaxLength, value: 200 },
-    ]);
+    setFieldValidations('mensajeRegalo',
+      // forma tradicional — también funciona
+      [{ type: ValidationType.MaxLength, value: 200 }]
+    );
     setPaso('extras');
   };
 
@@ -247,11 +255,14 @@ function WizardCheckout() {
 Cuando existen múltiples reglas para un campo, se ejecutan en **orden de inserción**. La validación se detiene en el primer fallo (comportamiento "primer error únicamente").
 
 ```ts
+import { rule, ValidationType } from 'vali-valid';
+
 // Orden de ejecución: Required → MinLength → Email
 // Se detiene en el primer fallo
-addFieldValidation('email', [
-  { type: ValidationType.Required },       // se verifica primero
-  { type: ValidationType.MinLength, value: 5 },
-  { type: ValidationType.Email },          // se verifica al final
-]);
+addFieldValidation('email', rule()
+  .required()       // se verifica primero
+  .minLength(5)
+  .email()          // se verifica al final
+  .build()
+);
 ```

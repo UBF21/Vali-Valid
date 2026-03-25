@@ -1,6 +1,6 @@
 # Referencia de validadores
 
-Los 43 tipos de validación disponibles en ValiValid v2, organizados por categoría.
+Los 74+ tipos de validación disponibles en ValiValid v3.1.0, organizados por categoría.
 
 ---
 
@@ -56,8 +56,32 @@ mindmap
     Cross-field
       MatchField
       RequiredIf
+      DateRange
     Asíncrono
       AsyncPattern
+    v3 — Nuevos
+      NotOneOf
+      IPv6
+      MACAddress
+      DataURI
+      MimeType
+      ArrayItems
+      AlphaDash
+      NotEmpty
+      JWT
+      Finite
+      Port
+      GreaterThanOrEqual
+      LessThanOrEqual
+      DateAfterField
+      DateBeforeField
+      ArrayExactLength
+    Lógica
+      Not
+      If
+      Optional
+      Nullable
+      Bail
 ```
 
 ---
@@ -679,3 +703,337 @@ Todos los validadores tienen mensajes predeterminados en inglés. Personaliza cu
 | `MatchField` | `Fields do not match.` |
 | `RequiredIf` | `This field is required.` |
 | `AsyncPattern` | `Validation failed.` |
+| `NotOneOf` | `The value is not allowed.` |
+| `IPv6` | `Invalid IPv6 address.` |
+| `MACAddress` | `Invalid MAC address.` |
+| `DataURI` | `Invalid data URI.` |
+| `MimeType` | `Invalid MIME type.` |
+| `DateRange` | `The start date must be before or equal to the end date.` |
+| `ArrayItems` | _(mensaje del sub-validador que falla)_ |
+
+---
+
+## Nuevos en v3 (primeros 7 tipos)
+
+### `NotOneOf`
+El valor NO debe estar en la lista proporcionada. Útil para palabras prohibidas, nombres de usuario reservados, etc.
+
+```ts
+{ type: ValidationType.NotOneOf, value: ['admin', 'root', 'superuser'] }
+{ type: ValidationType.NotOneOf, value: ['test', 'demo'], message: 'Ese nombre de usuario está reservado.' }
+// ✅ "juan", "maria"
+// ❌ "admin", "root"
+```
+
+---
+
+### `IPv6`
+Dirección IPv6 válida.
+
+```ts
+{ type: ValidationType.IPv6 }
+// ✅ 2001:0db8:85a3:0000:0000:8a2e:0370:7334, ::1
+// ❌ 192.168.1.1, 2001:db8::g1
+```
+
+---
+
+### `MACAddress`
+Dirección MAC válida. Acepta tanto el formato con dos puntos (`AA:BB:CC:DD:EE:FF`) como con guiones (`AA-BB-CC-DD-EE-FF`).
+
+```ts
+{ type: ValidationType.MACAddress }
+// ✅ 00:1A:2B:3C:4D:5E, 00-1A-2B-3C-4D-5E
+// ❌ 001A2B3C4D5E, 00:1A:2B:3C:4D
+```
+
+---
+
+### `DataURI`
+Data URI válido con codificación base64.
+
+```ts
+{ type: ValidationType.DataURI }
+// ✅ data:image/png;base64,iVBORw0KGgoAAAANS...
+// ❌ "texto plano", "http://ejemplo.com/imagen.png"
+```
+
+---
+
+### `MimeType`
+Tipo MIME válido. Soporta wildcards como `image/*` para aceptar cualquier subtipo.
+
+```ts
+{ type: ValidationType.MimeType, value: ['image/jpeg', 'image/png'] }
+{ type: ValidationType.MimeType, value: ['image/*', 'application/pdf'], message: 'Solo imágenes o PDF.' }
+// ✅ "image/jpeg", "image/gif" (con wildcard image/*)
+// ❌ "text/html", "video/mp4"
+```
+
+---
+
+### `DateRange`
+Valida que una fecha de inicio sea anterior o igual a una fecha de fin. Es un validador cross-field: usa `startField` y `endField` para referenciar los campos del formulario.
+
+```ts
+{
+  type: ValidationType.DateRange,
+  startField: 'fechaInicio',
+  endField: 'fechaFin',
+  message: 'La fecha de inicio debe ser anterior o igual a la fecha de fin.',
+}
+```
+
+```tsx
+// Ejemplo completo:
+{
+  field: 'fechaInicio',
+  validations: [
+    { type: ValidationType.Required },
+    {
+      type: ValidationType.DateRange,
+      startField: 'fechaInicio',
+      endField: 'fechaFin',
+      message: 'La fecha de inicio no puede ser posterior a la fecha de fin.',
+    },
+  ],
+}
+```
+
+---
+
+### `ArrayItems`
+Valida cada elemento de un array aplicando un conjunto de sub-reglas. Si algún elemento falla, el campo completo se considera inválido.
+
+```ts
+{
+  type: ValidationType.ArrayItems,
+  validations: [
+    { type: ValidationType.Required },
+    { type: ValidationType.Email },
+  ],
+  message: 'Todos los elementos deben ser emails válidos.',
+}
+```
+
+```tsx
+// Ejemplo: campo de etiquetas donde cada etiqueta debe ser un slug válido
+{
+  field: 'etiquetas',
+  validations: [
+    {
+      type: ValidationType.ArrayItems,
+      validations: [
+        { type: ValidationType.Required },
+        { type: ValidationType.Slug },
+        { type: ValidationType.MaxLength, value: 20 },
+      ],
+    },
+  ],
+}
+```
+
+---
+
+## Nuevos en v3.1.0 (15 tipos adicionales)
+
+### `AlphaDash`
+Letras, números y guiones (`-` y `_`). Útil para nombres de usuario con guiones.
+
+```ts
+{ type: ValidationType.AlphaDash }
+// ✅ "mi-usuario", "user_123"
+// ❌ "mi usuario", "user@123"
+```
+
+---
+
+### `NotEmpty`
+El valor no puede ser un string vacío ni contener solo espacios en blanco. Diferente de `Required`: permite `null` / `undefined` pero rechaza `""` y `"   "`.
+
+```ts
+{ type: ValidationType.NotEmpty }
+// ✅ "hola", "  hola  "
+// ❌ "", "   "
+```
+
+---
+
+### `JWT`
+Formato de JSON Web Token válido (tres segmentos base64url separados por puntos).
+
+```ts
+{ type: ValidationType.JWT }
+// ✅ "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc123"
+// ❌ "token.invalido", "no-es-jwt"
+```
+
+---
+
+### `Finite`
+El valor debe ser un número finito (no `Infinity`, `-Infinity` ni `NaN`).
+
+```ts
+{ type: ValidationType.Finite }
+// ✅ 42, 3.14, -100
+// ❌ Infinity, -Infinity, NaN
+```
+
+---
+
+### `Port`
+Número de puerto TCP/UDP válido (entre 0 y 65535).
+
+```ts
+{ type: ValidationType.Port }
+// ✅ 80, 443, 8080, 3000
+// ❌ -1, 65536, 99999
+```
+
+---
+
+### `GreaterThanOrEqual`
+El valor numérico debe ser mayor o igual que el mínimo especificado.
+
+```ts
+{ type: ValidationType.GreaterThanOrEqual, value: 18 }
+{ type: ValidationType.GreaterThanOrEqual, value: 0, message: 'El valor no puede ser negativo.' }
+// ✅ 18, 100
+// ❌ 17, -1
+```
+
+---
+
+### `LessThanOrEqual`
+El valor numérico debe ser menor o igual que el máximo especificado.
+
+```ts
+{ type: ValidationType.LessThanOrEqual, value: 100 }
+{ type: ValidationType.LessThanOrEqual, value: 999, message: 'El valor no puede superar 999.' }
+// ✅ 0, 50, 100
+// ❌ 101, 1000
+```
+
+---
+
+### `DateAfterField` _(cross-field)_
+La fecha del campo actual debe ser posterior a la fecha de otro campo del formulario.
+
+```ts
+{
+  type: ValidationType.DateAfterField,
+  field: 'fechaInicio',
+  message: 'La fecha de fin debe ser posterior a la fecha de inicio.',
+}
+```
+
+```tsx
+// Ejemplo completo:
+{
+  field: 'fechaFin',
+  validations: [
+    { type: ValidationType.Required },
+    {
+      type: ValidationType.DateAfterField,
+      field: 'fechaInicio',
+      message: 'La fecha de fin debe ser posterior a la de inicio.',
+    },
+  ],
+}
+```
+
+---
+
+### `DateBeforeField` _(cross-field)_
+La fecha del campo actual debe ser anterior a la fecha de otro campo del formulario.
+
+```ts
+{
+  type: ValidationType.DateBeforeField,
+  field: 'fechaFin',
+  message: 'La fecha de inicio debe ser anterior a la fecha de fin.',
+}
+```
+
+---
+
+### `ArrayExactLength`
+El array debe tener exactamente N elementos.
+
+```ts
+{ type: ValidationType.ArrayExactLength, value: 3 }
+{ type: ValidationType.ArrayExactLength, value: 5, message: 'Selecciona exactamente 5 opciones.' }
+// ✅ [1, 2, 3]
+// ❌ [1, 2], [1, 2, 3, 4]
+```
+
+---
+
+## Validadores de lógica (5 tipos)
+
+### `Not`
+Invierte el resultado de otro validador. El campo pasa la validación si el validador interno _falla_.
+
+```ts
+{
+  type: ValidationType.Not,
+  rule: { type: ValidationType.Email },
+  message: 'Este campo no debe ser un email.',
+}
+```
+
+---
+
+### `If`
+Aplica una regla solo si se cumple una condición sobre el formulario completo. Similar a `RequiredIf` pero para cualquier validador.
+
+```ts
+{
+  type: ValidationType.If,
+  condition: (form) => form.tipo === 'empresa',
+  rule: { type: ValidationType.Required },
+  message: 'El CIF es obligatorio para empresas.',
+}
+```
+
+---
+
+### `Optional`
+Marca el campo como opcional: si el valor está vacío, omite las demás validaciones de la cadena. Útil en el builder para campos no requeridos con formato específico.
+
+```ts
+{ type: ValidationType.Optional }
+// Si el campo está vacío → pasa sin errores
+// Si el campo tiene valor → continúa con las demás reglas
+```
+
+```ts
+// Con el builder:
+rule().optional().email().build()
+// → Si el email está vacío, es válido. Si tiene valor, debe tener formato email.
+```
+
+---
+
+### `Nullable`
+Permite que el campo tenga valor `null` explícito. Si el valor es `null`, omite el resto de las validaciones.
+
+```ts
+{ type: ValidationType.Nullable }
+```
+
+---
+
+### `Bail`
+Detiene la ejecución de las reglas restantes en el momento en que se produce el primer error. Equivalente a `criteriaMode: 'firstError'` aplicado a un campo específico.
+
+```ts
+{ type: ValidationType.Bail }
+// Colócalo al inicio del array de validaciones para detener en el primer error:
+validations: [
+  { type: ValidationType.Bail },
+  { type: ValidationType.Required },
+  { type: ValidationType.MinLength, value: 3 },
+  { type: ValidationType.Email },
+]
+```

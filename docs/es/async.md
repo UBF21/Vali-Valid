@@ -54,30 +54,34 @@ El tipo async más flexible. Proporciona una `asyncFn` que retorna `Promise<bool
 ### Ejemplo: verificar disponibilidad de nombre de usuario
 
 ```tsx
+import { rule, useValiValid } from 'vali-valid';
+
 {
   field: 'username',
-  validations: [
-    { type: ValidationType.Required },
-    { type: ValidationType.MinLength, value: 3 },
-    { type: ValidationType.Slug },
-    {
-      type: ValidationType.AsyncPattern,
-      message: 'Este nombre de usuario ya está en uso.',
-      asyncFn: async (value) => {
+  validations: rule()
+    .required()
+    .minLength(3)
+    .slug()
+    .asyncPattern(
+      async (value) => {
         const res = await fetch(`/api/usuarios/verificar?username=${encodeURIComponent(value)}`);
         const data = await res.json();
         return data.disponible; // true = válido
       },
-    },
-  ],
+      'Este nombre de usuario ya está en uso.',
+    )
+    .build(),
 }
 ```
 
 ### Ejemplo: validar cupón con contexto del formulario
 
 ```tsx
+import { rule, useValiValid, ValidationType } from 'vali-valid';
+
 {
   field: 'cupon',
+  // forma tradicional — también funciona
   validations: [
     {
       type: ValidationType.AsyncPattern,
@@ -113,43 +117,32 @@ Se configuran como cualquier otra regla — el manejo asíncrono es transparente
 ### Ejemplo: restricciones de foto de perfil
 
 ```tsx
+import { rule, useValiValid, TypeFile, FileSize } from 'vali-valid';
+
 {
   field: 'avatar',
-  validations: [
-    { type: ValidationType.Required },
-    { type: ValidationType.FileType, value: [TypeFile.JPG, TypeFile.PNG] },
-    { type: ValidationType.FileSize, value: FileSize['5MB'] },
-
+  validations: rule()
+    .required()
+    .fileType([TypeFile.JPG, TypeFile.PNG])
+    .fileSize(FileSize['5MB'])
     // Debe ser 1:1 (cuadrado) con ±1% de tolerancia
-    {
-      type: ValidationType.ImageAspectRatio,
-      value: { width: 1, height: 1 },
-      tolerance: 0.01,
-      message: 'La foto de perfil debe ser cuadrada.',
-    },
-
+    .imageAspectRatio({ width: 1, height: 1 }, 0.01, 'La foto de perfil debe ser cuadrada.')
     // Al menos 400×400 px
-    {
-      type: ValidationType.ImageMinDimensions,
-      value: { width: 400, height: 400 },
-      message: 'El tamaño mínimo es 400×400 px.',
-    },
-
+    .imageMinDimensions({ width: 400, height: 400 }, 'El tamaño mínimo es 400×400 px.')
     // No más de 2000×2000 px
-    {
-      type: ValidationType.ImageMaxDimensions,
-      value: { width: 2000, height: 2000 },
-      message: 'El tamaño máximo es 2000×2000 px.',
-    },
-  ],
+    .imageMaxDimensions({ width: 2000, height: 2000 }, 'El tamaño máximo es 2000×2000 px.')
+    .build(),
 }
 ```
 
 ### Ejemplo: banner con dimensiones exactas
 
 ```tsx
+import { rule, useValiValid, TypeFile, ValidationType } from 'vali-valid';
+
 {
   field: 'banner',
+  // forma tradicional — también funciona
   validations: [
     { type: ValidationType.FileType, value: [TypeFile.JPG, TypeFile.PNG] },
     {

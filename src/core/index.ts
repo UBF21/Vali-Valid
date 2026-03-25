@@ -1,12 +1,8 @@
-// Engine
-export { ValiValid } from './validation/ValiValid';
-export { RuleBuilder, rule } from './builder/index';
-
-// i18n
-export { setLocale, getLocale, getMessage, getMessageForLocale, SUPPORTED_LOCALES } from './i18n/index';
-export type { Locale } from './i18n/index';
-
-// Types
+// Core engine — zero framework dependencies
+export { RuleBuilder, rule } from '../builder/index';
+export { ValiValid } from '../validation/ValiValid';
+export { setLocale, getLocale, getMessage } from '../i18n/index';
+export type { Locale } from '../i18n/index';
 export type {
     FieldValidationConfig,
     BuilderValidationConfig,
@@ -15,21 +11,14 @@ export type {
     ValidationsConfig,
     SyncRule,
     AsyncRule,
-    ValiValidOptions,
-} from './types/index';
-
+} from '../types/index';
 export {
     TypeFile,
     FileSize,
     DateFormat,
     DateFormatExpressions,
-} from './types/index';
-
-// Utilities
-export { sanitizeNumber } from './constants/index';
-
-// Validation types & configs
-export { ValidationType } from './validation/Validators';
+} from '../types/index';
+export { ValidationType } from '../validation/Validators';
 export type {
     ValidationConfigRequired,
     ValidationConfigMinLength,
@@ -74,7 +63,6 @@ export type {
     ValidationConfigMatchField,
     ValidationConfigRequiredIf,
     ValidationConfigAsyncPattern,
-    // v2.1
     ValidationConfigGreaterThan,
     ValidationConfigLessThan,
     ValidationConfigPrecision,
@@ -95,28 +83,11 @@ export type {
     ValidationConfigLongitude,
     ValidationConfigSemVer,
     ValidationConfigBase64,
-    // v3
     ValidationConfigNotOneOf,
     ValidationConfigIPv6,
     ValidationConfigMACAddress,
     ValidationConfigDataURI,
     ValidationConfigMimeType,
-    ValidationConfigDateRange,
     ValidationConfigArrayItems,
-    // v4
-    ValidationConfigAlphaDash,
-    ValidationConfigNotEmpty,
-    ValidationConfigJWT,
-    ValidationConfigFinite,
-    ValidationConfigPort,
-    ValidationConfigGreaterThanOrEqual,
-    ValidationConfigLessThanOrEqual,
-    ValidationConfigDateAfterField,
-    ValidationConfigDateBeforeField,
-    ValidationConfigArrayExactLength,
-    ValidationConfigNot,
-    ValidationConfigIf,
-    ValidationConfigOptional,
-    ValidationConfigNullable,
-    ValidationConfigBail,
-} from './validation/Validators';
+    ValidationConfigDateRange,
+} from '../validation/Validators';

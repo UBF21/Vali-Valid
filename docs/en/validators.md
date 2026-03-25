@@ -1,6 +1,6 @@
 # Validators reference
 
-All 43 validation types available in ValiValid v2, organized by category.
+All 74+ validation types available in ValiValid v3.1.0, organized by category.
 
 ---
 
@@ -39,8 +39,32 @@ mindmap
     Cross-field
       MatchField
       RequiredIf
+      DateRange
     Async
       AsyncPattern
+    v3 New
+      NotOneOf
+      IPv6
+      MACAddress
+      DataURI
+      MimeType
+      ArrayItems
+    v4 New
+      AlphaDash
+      NotEmpty
+      JWT
+      Finite
+      Port
+      GreaterThanOrEqual
+      LessThanOrEqual
+      DateAfterField
+      DateBeforeField
+      ArrayExactLength
+      Not
+      If
+      Optional
+      Nullable
+      Bail
 ```
 
 ---
@@ -238,6 +262,263 @@ See [async.md](./async.md) for full async documentation.
 
 ---
 
+## New in v3 (7 types)
+
+### `NotOneOf`
+
+Value must **not** be in the provided list.
+
+```ts
+{
+  type: ValidationType.NotOneOf,
+  value: ['admin', 'root', 'superuser'],
+  message: 'This username is reserved.',
+}
+```
+
+### `IPv6`
+
+Valid IPv6 address.
+
+```ts
+{ type: ValidationType.IPv6 }
+// e.g. 2001:db8::1
+```
+
+### `MACAddress`
+
+Valid MAC address. Accepts colon-separated (`AA:BB:CC:DD:EE:FF`) or hyphen-separated (`AA-BB-CC-DD-EE-FF`) formats.
+
+```ts
+{ type: ValidationType.MACAddress }
+```
+
+### `DataURI`
+
+Valid data URI containing base64-encoded content.
+
+```ts
+{ type: ValidationType.DataURI }
+// e.g. data:image/png;base64,iVBOR...
+```
+
+### `MimeType`
+
+MIME type must match one of the provided patterns. Supports wildcards such as `image/*`.
+
+```ts
+{
+  type: ValidationType.MimeType,
+  value: ['image/*', 'application/pdf'],
+}
+```
+
+### `DateRange` _(cross-field)_
+
+Validates that a start date is on or before an end date. Uses `startField` and `endField` to reference the two date fields on the form.
+
+```ts
+{
+  field: 'startDate',
+  validations: [
+    {
+      type: ValidationType.DateRange,
+      startField: 'startDate',
+      endField: 'endDate',
+      message: 'Start date must be before or equal to end date.',
+    },
+  ],
+}
+```
+
+### `ArrayItems`
+
+Validates each element of an array field against a set of sub-rules. Provide the sub-rules as a `ValidationsConfig[]` array (or use the builder — see [builder.md](./builder.md)).
+
+```ts
+{
+  field: 'emails',
+  validations: [
+    {
+      type: ValidationType.ArrayItems,
+      rules: [
+        { type: ValidationType.Required },
+        { type: ValidationType.Email },
+      ],
+    },
+  ],
+}
+```
+
+---
+
+## New in v4 (15 types)
+
+### `AlphaDash`
+
+Letters, digits, hyphens, and underscores only.
+
+```ts
+{ type: ValidationType.AlphaDash }
+// e.g. 'my-username_01'
+```
+
+### `NotEmpty`
+
+Value must not be an empty array, empty string, or whitespace-only string. Unlike `Required`, this passes for `0` and `false` but fails for `[]` and `''`.
+
+```ts
+{ type: ValidationType.NotEmpty }
+```
+
+### `JWT`
+
+Valid JSON Web Token format (`xxxxx.yyyyy.zzzzz`).
+
+```ts
+{ type: ValidationType.JWT }
+```
+
+### `Finite`
+
+Value must be a finite number (rejects `Infinity`, `-Infinity`, `NaN`).
+
+```ts
+{ type: ValidationType.Finite }
+```
+
+### `Port`
+
+Integer in the valid TCP/UDP port range 0–65535.
+
+```ts
+{ type: ValidationType.Port }
+```
+
+### `GreaterThanOrEqual`
+
+Numeric value must be ≥ the provided number.
+
+```ts
+{ type: ValidationType.GreaterThanOrEqual, value: 18 }
+```
+
+### `LessThanOrEqual`
+
+Numeric value must be ≤ the provided number.
+
+```ts
+{ type: ValidationType.LessThanOrEqual, value: 100 }
+```
+
+### `DateAfterField`
+
+Date value must be after the date in another form field.
+
+```ts
+{
+  field: 'endDate',
+  validations: [
+    {
+      type: ValidationType.DateAfterField,
+      field: 'startDate',
+      message: 'End date must be after start date.',
+    },
+  ],
+}
+```
+
+### `DateBeforeField`
+
+Date value must be before the date in another form field.
+
+```ts
+{
+  type: ValidationType.DateBeforeField,
+  field: 'expiryDate',
+  message: 'Issue date must be before the expiry date.',
+}
+```
+
+### `ArrayExactLength`
+
+Array must contain exactly N items.
+
+```ts
+{ type: ValidationType.ArrayExactLength, value: 3 }
+```
+
+### `Not`
+
+Negates another validator — passes when the wrapped rule fails, and fails when the wrapped rule passes.
+
+```ts
+{
+  type: ValidationType.Not,
+  rule: { type: ValidationType.Email },
+  message: 'Value must not be an email address.',
+}
+```
+
+### `If`
+
+Conditionally applies a validator only when a predicate returns `true`.
+
+```ts
+{
+  type: ValidationType.If,
+  condition: (form) => form.role === 'admin',
+  rule: { type: ValidationType.MinLength, value: 12 },
+  message: 'Admin passwords must be at least 12 characters.',
+}
+```
+
+### `Optional`
+
+Skips all subsequent rules when the value is empty (empty string, `null`, `undefined`). Place it first in the validations array to make a field fully optional.
+
+```ts
+{
+  field: 'website',
+  validations: [
+    { type: ValidationType.Optional },
+    { type: ValidationType.Url },
+  ],
+}
+```
+
+### `Nullable`
+
+Skips all subsequent rules when the value is `null` or `undefined`, but still validates non-null values.
+
+```ts
+{
+  field: 'middleName',
+  validations: [
+    { type: ValidationType.Nullable },
+    { type: ValidationType.MinLength, value: 2 },
+  ],
+}
+```
+
+### `Bail`
+
+Stops rule evaluation for the field on the first error encountered. Place after the rules you want to short-circuit.
+
+```ts
+{
+  field: 'email',
+  validations: [
+    { type: ValidationType.Required },
+    { type: ValidationType.Bail },
+    { type: ValidationType.Email },
+    // Email format is only checked when Required passes
+  ],
+}
+```
+
+---
+
 ## Default error messages
 
 | Validator | Default message |
@@ -285,3 +566,25 @@ See [async.md](./async.md) for full async documentation.
 | `MatchField` | `Fields do not match.` |
 | `RequiredIf` | `This field is required.` |
 | `AsyncPattern` | `Validation failed.` |
+| `NotOneOf` | `The value is not allowed.` |
+| `IPv6` | `Invalid IPv6 address.` |
+| `MACAddress` | `Invalid MAC address.` |
+| `DataURI` | `Invalid data URI.` |
+| `MimeType` | `MIME type not allowed.` |
+| `DateRange` | `Start date must be on or before end date.` |
+| `ArrayItems` | _(uses sub-rule messages)_ |
+| `AlphaDash` | `Only letters, numbers, hyphens, and underscores are allowed.` |
+| `NotEmpty` | `The field must not be empty.` |
+| `JWT` | `Invalid JWT format.` |
+| `Finite` | `The value must be a finite number.` |
+| `Port` | `Invalid port number (must be 0–65535).` |
+| `GreaterThanOrEqual` | `The value must be greater than or equal to {n}.` |
+| `LessThanOrEqual` | `The value must be less than or equal to {n}.` |
+| `DateAfterField` | `The date must be after {field}.` |
+| `DateBeforeField` | `The date must be before {field}.` |
+| `ArrayExactLength` | `The field must contain exactly {n} items.` |
+| `Not` | `The value does not meet the required condition.` |
+| `If` | _(uses the wrapped rule's message)_ |
+| `Optional` | _(synthetic — produces no message)_ |
+| `Nullable` | _(synthetic — produces no message)_ |
+| `Bail` | _(synthetic — produces no message)_ |

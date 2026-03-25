@@ -12,7 +12,7 @@ La clase `ValiValid<T>` es el motor central detrás de `useValiValid`. Gestiona 
 ## Importación
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 ```
 
 ---
@@ -20,27 +20,50 @@ import { ValiValid, ValidationType } from 'vali-valid';
 ## Constructor
 
 ```ts
-new ValiValid<T>(configs?: FieldValidationConfig<T>[])
+new ValiValid<T>(configs?: FieldValidationConfig<T>[], options?: ValiValidEngineOptions)
 ```
 
 | Parámetro | Tipo | Requerido | Descripción |
 |-----------|------|-----------|-------------|
 | `configs` | `FieldValidationConfig<T>[]` | No | Reglas de validación iniciales por campo |
+| `options` | `ValiValidEngineOptions` | No | Opciones del motor (ver más abajo) |
+
+### `ValiValidEngineOptions`
 
 ```ts
+interface ValiValidEngineOptions {
+  asyncTimeout?: number;                    // Timeout en ms para validadores async (default 5000)
+  criteriaMode?: 'firstError' | 'all';     // Devolver solo el primer error o todos por campo
+}
+```
+
+| Opción | Tipo | Por defecto | Descripción |
+|--------|------|-------------|-------------|
+| `asyncTimeout` | `number` | `5000` | Tiempo máximo en ms antes de que una promesa async se rechace con error de timeout. Aplica a `AsyncPattern` y validadores de imagen. |
+| `criteriaMode` | `'firstError' \| 'all'` | `'all'` | `'firstError'` detiene la ejecución tras el primer error por campo; `'all'` ejecuta todas las reglas y acumula los mensajes en un array. |
+
+```ts
+// Ejemplo con opciones del motor
+const motor = new ValiValid<Formulario>([...configs], {
+  asyncTimeout: 3000,       // cancelar validaciones async si tardan más de 3 s
+  criteriaMode: 'all',      // mostrar todos los errores por campo
+});
+```
+
+```ts
+import { ValiValid, rule, ValidationType } from 'vali-valid';
+
 type Formulario = { email: string; edad: number };
 
 const motor = new ValiValid<Formulario>([
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'edad',
     isNumber: true,
+    // forma tradicional — también funciona
     validations: [
       { type: ValidationType.Required },
       { type: ValidationType.NumberRange, value: [18, 99] },
@@ -55,20 +78,26 @@ const motor = new ValiValid<Formulario>([
 
 ### `validateSync(fields: T): FormErrors<T>`
 
-Ejecuta todas las reglas síncronas contra un objeto de formulario completo. Devuelve un mapa de errores.
+Ejecuta todas las reglas síncronas contra un objeto de formulario completo. Devuelve un mapa de errores donde cada valor es `string[] | null`.
 
 ```ts
 const errores = motor.validateSync({ email: 'no-es-email', edad: 15 });
-// errores.email → 'Does not have email format.'
-// errores.edad  → 'The value must be between 18 and 99.'
+// errores.email → ['Does not have email format.']
+// errores.edad  → ['The value must be between 18 and 99.']
+
+// Mostrar los errores en React:
+errores.email?.map((msg, i) => <p key={i}>{msg}</p>)
+
+// Comprobar si hay errores:
+const hayErrores = Object.values(errores).some(Boolean);
 ```
 
-### `validateFieldSync(field: keyof T, value: any): string | null`
+### `validateFieldSync(field: keyof T, value: any): string[] | null`
 
-Valida el valor de un único campo contra sus reglas síncronas. Devuelve el primer mensaje de error o `null`.
+Valida el valor de un único campo contra sus reglas síncronas. Devuelve un array de mensajes de error o `null` si la validación es exitosa.
 
 ```ts
-motor.validateFieldSync('email', 'hola');    // 'Does not have email format.'
+motor.validateFieldSync('email', 'hola');    // ['Does not have email format.']
 motor.validateFieldSync('email', 'a@b.co'); // null
 ```
 
@@ -97,9 +126,9 @@ const error = await motor.validateFieldAsync('avatar', archivo, formulario);
 Agrega reglas a un campo (se combina con las existentes).
 
 ```ts
-motor.addFieldValidation('username', [
-  { type: ValidationType.Slug },
-]);
+import { rule } from 'vali-valid';
+
+motor.addFieldValidation('username', rule().slug().build());
 ```
 
 ### `removeFieldValidation(field, type): void`
@@ -107,6 +136,8 @@ motor.addFieldValidation('username', [
 Elimina todas las reglas de un tipo específico de un campo.
 
 ```ts
+import { ValidationType } from 'vali-valid';
+
 motor.removeFieldValidation('telefono', ValidationType.Required);
 ```
 
@@ -115,9 +146,9 @@ motor.removeFieldValidation('telefono', ValidationType.Required);
 Reemplaza todas las reglas de un campo.
 
 ```ts
-motor.setFieldValidations('rol', [
-  { type: ValidationType.Required },
-]);
+import { rule } from 'vali-valid';
+
+motor.setFieldValidations('rol', rule().required().build());
 ```
 
 ### `clearFieldValidations(field): void`
@@ -164,7 +195,7 @@ El motor `ValiValid` **no tiene dependencias de React**. Puedes usarlo en cualqu
 <!-- LoginForm.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type LoginForm = { email: string; password: string };
 
@@ -175,13 +206,11 @@ const enviando = ref(false);
 const motor = new ValiValid<LoginForm>([
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'password',
+    // forma tradicional — también funciona
     validations: [
       { type: ValidationType.Required },
       { type: ValidationType.MinLength, value: 8 },
@@ -240,7 +269,7 @@ async function handleSubmit() {
 ```ts
 // validation.service.ts
 import { Injectable } from '@angular/core';
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type LoginForm = { email: string; password: string };
 
@@ -249,17 +278,11 @@ export class LoginValidationService {
   private motor = new ValiValid<LoginForm>([
     {
       field: 'email',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.Email },
-      ],
+      validations: rule().required().email().build(),
     },
     {
       field: 'password',
-      validations: [
-        { type: ValidationType.Required },
-        { type: ValidationType.MinLength, value: 8 },
-      ],
+      validations: rule().required().minLength(8).build(),
     },
   ]);
 
@@ -340,7 +363,7 @@ export class LoginComponent {
 ### Node.js (validación del lado del servidor)
 
 ```ts
-import { ValiValid, ValidationType, setLocale } from 'vali-valid';
+import { ValiValid, rule, setLocale } from 'vali-valid';
 
 setLocale('es');
 
@@ -349,26 +372,16 @@ type CrearUsuarioDto = { username: string; email: string; edad: number };
 const validador = new ValiValid<CrearUsuarioDto>([
   {
     field: 'username',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 3 },
-      { type: ValidationType.AlphaNumeric },
-    ],
+    validations: rule().required().minLength(3).alphaNumeric().build(),
   },
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'edad',
     isNumber: true,
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.NumberRange, value: [18, 120] },
-    ],
+    validations: rule().required().numberRange(18, 120).build(),
   },
 ]);
 
@@ -385,7 +398,7 @@ export function validarCrearUsuario(body: unknown) {
 ## Ejemplo de uso standalone (sin React)
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type FormularioPedido = {
   email: string;
@@ -396,22 +409,16 @@ type FormularioPedido = {
 const validador = new ValiValid<FormularioPedido>([
   {
     field: 'email',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Email },
-    ],
+    validations: rule().required().email().build(),
   },
   {
     field: 'cantidad',
     isNumber: true,
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.NumberRange, value: [1, 100] },
-      { type: ValidationType.Integer },
-    ],
+    validations: rule().required().numberRange(1, 100).integer().build(),
   },
   {
     field: 'voucher',
+    // forma tradicional — también funciona
     validations: [
       {
         type: ValidationType.AsyncPattern,

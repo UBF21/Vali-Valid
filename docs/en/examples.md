@@ -19,6 +19,7 @@ Practical examples covering every feature of ValiValid — from basic forms to a
 11. [New v2.1 validators — arrays](#11-new-v21-validators--arrays)
 12. [New v2.1 validators — cross-field](#12-new-v21-validators--cross-field)
 13. [New v2.1 validators — format & geo](#13-new-v21-validators--format--geo)
+14. [v3.1.0 — builder syntax + criteriaMode](#14-v310--builder-syntax--criteriamode)
 
 ---
 
@@ -27,7 +28,7 @@ Practical examples covering every feature of ValiValid — from basic forms to a
 **Validators used:** `Required`, `Email`, `MinLength`
 
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type LoginForm = { email: string; password: string };
 
@@ -38,13 +39,11 @@ export function LoginForm() {
       validations: [
         {
           field: 'email',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.Email },
-          ],
+          validations: rule().required().email().build(),
         },
         {
           field: 'password',
+          // traditional form — also valid
           validations: [
             { type: ValidationType.Required },
             { type: ValidationType.MinLength, value: 8 },
@@ -67,7 +66,7 @@ export function LoginForm() {
         onChange={(e) => handleChange('email', e.target.value)}
         placeholder="Email"
       />
-      {errors.email && <p style={{ color: 'red' }}>{errors.email}</p>}
+      {errors.email?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
 
       <input
         type="password"
@@ -75,7 +74,7 @@ export function LoginForm() {
         onChange={(e) => handleChange('password', e.target.value)}
         placeholder="Password"
       />
-      {errors.password && <p style={{ color: 'red' }}>{errors.password}</p>}
+      {errors.password?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
 
       <button type="submit" disabled={!isValid}>Sign in</button>
       <button type="button" onClick={() => reset()}>Clear</button>
@@ -91,7 +90,7 @@ export function LoginForm() {
 **Validators used:** `Required`, `Alpha`, `MinLength`, `MaxLength`, `Email`, `PasswordStrength`, `MatchField`
 
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type RegisterForm = {
   firstName: string;
@@ -108,38 +107,23 @@ export function RegisterForm() {
       validations: [
         {
           field: 'firstName',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.Alpha },
-            { type: ValidationType.MinLength, value: 2 },
-            { type: ValidationType.MaxLength, value: 30 },
-          ],
+          validations: rule().required().alpha().minLength(2).maxLength(30).build(),
         },
         {
           field: 'lastName',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.Alpha },
-            { type: ValidationType.MinLength, value: 2 },
-            { type: ValidationType.MaxLength, value: 30 },
-          ],
+          validations: rule().required().alpha().minLength(2).maxLength(30).build(),
         },
         {
           field: 'email',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.Email },
-          ],
+          validations: rule().required().email().build(),
         },
         {
           field: 'password',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.PasswordStrength },
-          ],
+          validations: rule().required().passwordStrength().build(),
         },
         {
           field: 'confirmPassword',
+          // traditional form — also valid
           validations: [
             { type: ValidationType.Required },
             {
@@ -168,7 +152,7 @@ export function RegisterForm() {
             onChange={(e) => handleChange(field, e.target.value)}
             placeholder={field}
           />
-          {errors[field] && <p style={{ color: 'red' }}>{errors[field]}</p>}
+          {errors[field]?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
         </div>
       ))}
       <button type="submit" disabled={!isValid}>Register</button>
@@ -186,7 +170,7 @@ export function RegisterForm() {
 `asyncFn` receives `(value, form)` so you can write cross-field async logic.
 
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type SignupForm = { username: string; email: string };
 
@@ -207,19 +191,19 @@ export function AsyncSignupForm() {
       validations: [
         {
           field: 'username',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.MinLength, value: 3 },
-            { type: ValidationType.Slug },
-            {
-              type: ValidationType.AsyncPattern,
-              message: 'Username is already taken.',
-              asyncFn: (value) => isUsernameAvailable(value),
-            },
-          ],
+          validations: rule()
+            .required()
+            .minLength(3)
+            .slug()
+            .asyncPattern(
+              (value) => isUsernameAvailable(value),
+              'Username is already taken.',
+            )
+            .build(),
         },
         {
           field: 'email',
+          // traditional form — also valid
           validations: [
             { type: ValidationType.Required },
             { type: ValidationType.Email },
@@ -241,7 +225,7 @@ export function AsyncSignupForm() {
         placeholder="Username"
       />
       {isValidating && <span>Checking…</span>}
-      {errors.username && <p style={{ color: 'red' }}>{errors.username}</p>}
+      {errors.username?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
       {errors.username === null && <p style={{ color: 'green' }}>✓ Available</p>}
 
       <input
@@ -250,7 +234,7 @@ export function AsyncSignupForm() {
         onChange={(e) => handleChange('email', e.target.value)}
         placeholder="Email"
       />
-      {errors.email && <p style={{ color: 'red' }}>{errors.email}</p>}
+      {errors.email?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
 
       <button type="submit" disabled={isValidating}>
         {isValidating ? 'Validating…' : 'Create account'}
@@ -267,7 +251,7 @@ export function AsyncSignupForm() {
 **Validators used:** `Required`, `FileType`, `FileSize`, `ImageAspectRatio`, `ImageMinDimensions`, `ImageMaxDimensions`, `FileDimensions`
 
 ```tsx
-import { useValiValid, ValidationType, TypeFile, FileSize } from 'vali-valid';
+import { rule, useValiValid, TypeFile, FileSize, ValidationType } from 'vali-valid';
 
 type MediaForm = { avatar: File | null; banner: File | null };
 
@@ -278,28 +262,18 @@ export function FileUploadForm() {
       validations: [
         {
           field: 'avatar',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.FileType, value: [TypeFile.JPG, TypeFile.PNG] },
-            { type: ValidationType.FileSize, value: FileSize['2MB'] },
-            {
-              type: ValidationType.ImageAspectRatio,
-              value: { width: 1, height: 1 },
-              tolerance: 0.02,
-              message: 'Avatar must be square (1:1).',
-            },
-            {
-              type: ValidationType.ImageMinDimensions,
-              value: { width: 200, height: 200 },
-            },
-            {
-              type: ValidationType.ImageMaxDimensions,
-              value: { width: 2000, height: 2000 },
-            },
-          ],
+          validations: rule()
+            .required()
+            .fileType([TypeFile.JPG, TypeFile.PNG])
+            .fileSize(FileSize['2MB'])
+            .imageAspectRatio({ width: 1, height: 1 }, 0.02, 'Avatar must be square (1:1).')
+            .imageMinDimensions({ width: 200, height: 200 })
+            .imageMaxDimensions({ width: 2000, height: 2000 })
+            .build(),
         },
         {
           field: 'banner',
+          // traditional form — also valid
           validations: [
             { type: ValidationType.Required },
             { type: ValidationType.FileType, value: [TypeFile.JPG, TypeFile.PNG] },
@@ -324,7 +298,7 @@ export function FileUploadForm() {
           accept="image/jpeg,image/png"
           onChange={(e) => handleChange('avatar', e.target.files?.[0] ?? null)}
         />
-        {errors.avatar && <p style={{ color: 'red' }}>{errors.avatar}</p>}
+        {errors.avatar?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
       </div>
 
       <div>
@@ -334,7 +308,7 @@ export function FileUploadForm() {
           accept="image/jpeg,image/png"
           onChange={(e) => handleChange('banner', e.target.files?.[0] ?? null)}
         />
-        {errors.banner && <p style={{ color: 'red' }}>{errors.banner}</p>}
+        {errors.banner?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
       </div>
 
       <button type="submit" disabled={isValidating}>
@@ -353,7 +327,7 @@ export function FileUploadForm() {
 
 ```tsx
 import { useState } from 'react';
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type OrderForm = {
   name: string; email: string;
@@ -368,8 +342,12 @@ export function MultiStepForm() {
     useValiValid<OrderForm>({
       initial: { name: '', email: '', shippingMethod: '', address: '', cardNumber: '', cvv: '' },
       validations: [
-        { field: 'name',  validations: [{ type: ValidationType.Required }, { type: ValidationType.MinLength, value: 2 }] },
-        { field: 'email', validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }] },
+        { field: 'name',  validations: rule().required().minLength(2).build() },
+        {
+          field: 'email',
+          // traditional form — also valid
+          validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }],
+        },
       ],
     });
 
@@ -380,7 +358,7 @@ export function MultiStepForm() {
     if (step === 1) {
       clearFieldValidations('name');
       clearFieldValidations('email');
-      setFieldValidations('shippingMethod', [{ type: ValidationType.Required }]);
+      setFieldValidations('shippingMethod', rule().required().build());
       setFieldValidations('address', [
         {
           type: ValidationType.RequiredIf,
@@ -393,8 +371,8 @@ export function MultiStepForm() {
     if (step === 2) {
       clearFieldValidations('shippingMethod');
       clearFieldValidations('address');
-      setFieldValidations('cardNumber', [{ type: ValidationType.Required }, { type: ValidationType.CreditCard }]);
-      setFieldValidations('cvv', [{ type: ValidationType.Required }, { type: ValidationType.DigitsOnly }, { type: ValidationType.MinLength, value: 3 }]);
+      setFieldValidations('cardNumber', rule().required().creditCard().build());
+      setFieldValidations('cvv', rule().required().digitsOnly().minLength(3).build());
     }
 
     setStep((s) => s + 1);
@@ -407,9 +385,9 @@ export function MultiStepForm() {
       {step === 1 && (
         <>
           <input value={form.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="Full name" />
-          {errors.name && <p style={{ color: 'red' }}>{errors.name}</p>}
+          {errors.name?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
           <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} placeholder="Email" />
-          {errors.email && <p style={{ color: 'red' }}>{errors.email}</p>}
+          {errors.email?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
         </>
       )}
 
@@ -420,11 +398,11 @@ export function MultiStepForm() {
             <option value="pickup">Store pickup</option>
             <option value="home">Home delivery</option>
           </select>
-          {errors.shippingMethod && <p style={{ color: 'red' }}>{errors.shippingMethod}</p>}
+          {errors.shippingMethod?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
           {form.shippingMethod === 'home' && (
             <>
               <input value={form.address} onChange={(e) => handleChange('address', e.target.value)} placeholder="Address" />
-              {errors.address && <p style={{ color: 'red' }}>{errors.address}</p>}
+              {errors.address?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
             </>
           )}
         </>
@@ -433,9 +411,9 @@ export function MultiStepForm() {
       {step === 3 && (
         <>
           <input value={form.cardNumber} onChange={(e) => handleChange('cardNumber', e.target.value)} placeholder="Card number" />
-          {errors.cardNumber && <p style={{ color: 'red' }}>{errors.cardNumber}</p>}
+          {errors.cardNumber?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
           <input value={form.cvv} onChange={(e) => handleChange('cvv', e.target.value)} placeholder="CVV" />
-          {errors.cvv && <p style={{ color: 'red' }}>{errors.cvv}</p>}
+          {errors.cvv?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
         </>
       )}
 
@@ -456,7 +434,7 @@ export function MultiStepForm() {
 
 ```tsx
 import { useState } from 'react';
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type ProfileForm = {
   username: string;
@@ -475,13 +453,13 @@ export function DynamicRulesForm() {
       validations: [
         {
           field: 'username',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.MinLength, value: 3 },
-            { type: ValidationType.Slug },
-          ],
+          validations: rule().required().minLength(3).slug().build(),
         },
-        { field: 'role', validations: [{ type: ValidationType.Required }] },
+        {
+          field: 'role',
+          // traditional form — also valid
+          validations: [{ type: ValidationType.Required }],
+        },
       ],
     });
 
@@ -489,17 +467,19 @@ export function DynamicRulesForm() {
   const handleRoleChange = (role: string) => {
     handleChange('role', role);
     if (role === 'admin') {
-      setFieldValidations('username', [
-        { type: ValidationType.Required },
-        { type: ValidationType.MinLength, value: 6 },
-        { type: ValidationType.AlphaNumeric },
-      ]);
+      setFieldValidations('username', rule()
+        .required()
+        .minLength(6)
+        .alphaNumeric()
+        .build()
+      );
     } else {
-      setFieldValidations('username', [
-        { type: ValidationType.Required },
-        { type: ValidationType.MinLength, value: 3 },
-        { type: ValidationType.Slug },
-      ]);
+      setFieldValidations('username', rule()
+        .required()
+        .minLength(3)
+        .slug()
+        .build()
+      );
     }
   };
 
@@ -507,11 +487,12 @@ export function DynamicRulesForm() {
   const togglePromo = (active: boolean) => {
     setHasPromo(active);
     if (active) {
-      addFieldValidation('promoCode', [
-        { type: ValidationType.Required },
-        { type: ValidationType.ExactLength, value: 8 },
-        { type: ValidationType.UpperCase },
-      ]);
+      addFieldValidation('promoCode', rule()
+        .required()
+        .exactLength(8)
+        .upperCase()
+        .build()
+      );
     } else {
       clearFieldValidations('promoCode');
       handleChange('promoCode', '');
@@ -521,14 +502,14 @@ export function DynamicRulesForm() {
   return (
     <form onSubmit={async (e) => { e.preventDefault(); await validate(); }}>
       <input value={form.username} onChange={(e) => handleChange('username', e.target.value)} placeholder="Username" />
-      {errors.username && <p style={{ color: 'red' }}>{errors.username}</p>}
+      {errors.username?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
 
       <select value={form.role} onChange={(e) => handleRoleChange(e.target.value)}>
         <option value="">Select role…</option>
         <option value="user">User</option>
         <option value="admin">Admin</option>
       </select>
-      {errors.role && <p style={{ color: 'red' }}>{errors.role}</p>}
+      {errors.role?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
 
       <label>
         <input type="checkbox" checked={hasPromo} onChange={(e) => togglePromo(e.target.checked)} />
@@ -537,7 +518,7 @@ export function DynamicRulesForm() {
       {hasPromo && (
         <>
           <input value={form.promoCode} onChange={(e) => handleChange('promoCode', e.target.value.toUpperCase())} placeholder="ABCD1234" maxLength={8} />
-          {errors.promoCode && <p style={{ color: 'red' }}>{errors.promoCode}</p>}
+          {errors.promoCode?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
         </>
       )}
 
@@ -556,7 +537,7 @@ Use `ValiValid` directly in Node.js, scripts, or server-side code.
 **Validators used:** `Required`, `Email`, `MinLength`, `NumberRange`, `Integer`, `NumberPositive`, `AsyncPattern`, `Pattern`, `DateFormat`, `FutureDate`
 
 ```ts
-import { ValiValid, ValidationType, DateFormat } from 'vali-valid';
+import { ValiValid, rule, ValidationType, DateFormat } from 'vali-valid';
 
 // ── 1. Sync validation ──────────────────────────────────────────────────────
 
@@ -565,19 +546,16 @@ type UserDto = { username: string; email: string; age: number };
 const validator = new ValiValid<UserDto>([
   {
     field: 'username',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.MinLength, value: 3 },
-      { type: ValidationType.Slug },
-    ],
+    validations: rule().required().minLength(3).slug().build(),
   },
   {
     field: 'email',
-    validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }],
+    validations: rule().required().email().build(),
   },
   {
     field: 'age',
     isNumber: true,
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Required },
       { type: ValidationType.NumberRange, value: [18, 120] },
@@ -602,17 +580,16 @@ type ProductDto = { sku: string; price: number };
 const productValidator = new ValiValid<ProductDto>([
   {
     field: 'sku',
-    validations: [
-      { type: ValidationType.Required },
-      {
-        type: ValidationType.AsyncPattern,
-        message: 'SKU already exists.',
-        asyncFn: async (value) => {
+    validations: rule()
+      .required()
+      .asyncPattern(
+        async (value) => {
           await new Promise((r) => setTimeout(r, 200));
           return !['PROD-001', 'PROD-002'].includes(value);
         },
-      },
-    ],
+        'SKU already exists.',
+      )
+      .build(),
   },
   {
     field: 'price',
@@ -631,14 +608,15 @@ const productValidator = new ValiValid<ProductDto>([
 type InvoiceForm = { clientName: string; vatNumber: string };
 
 const invoiceValidator = new ValiValid<InvoiceForm>([
-  { field: 'clientName', validations: [{ type: ValidationType.Required }] },
+  { field: 'clientName', validations: rule().required().build() },
 ]);
 
 // Add rules programmatically
-invoiceValidator.addFieldValidation('vatNumber', [
-  { type: ValidationType.Required },
-  { type: ValidationType.ExactLength, value: 9 },
-]);
+invoiceValidator.addFieldValidation('vatNumber', rule()
+  .required()
+  .exactLength(9)
+  .build()
+);
 
 console.log(invoiceValidator.validateFieldSync('vatNumber', '')); // Required field.
 
@@ -655,7 +633,7 @@ console.log(invoiceValidator.validateFieldSync('vatNumber', '')); // null (no ru
 Call `setLocale` **before** creating the engine (messages are resolved at rule registration time).
 
 ```ts
-import { setLocale, getLocale, useValiValid, ValidationType } from 'vali-valid';
+import { rule, setLocale, getLocale, useValiValid, ValidationType } from 'vali-valid';
 
 // Default locale is 'en'
 console.log(getLocale()); // 'en'
@@ -669,10 +647,8 @@ const { form, errors, handleChange } = useValiValid({
   validations: [
     {
       field: 'email',
-      validations: [
-        { type: ValidationType.Required },  // → 'Campo obligatorio.'
-        { type: ValidationType.Email },     // → 'El formato de correo electrónico no es válido.'
-      ],
+      validations: rule().required().email().build(),
+      // → 'Campo obligatorio.' / 'El formato de correo electrónico no es válido.'
     },
   ],
 });
@@ -700,7 +676,7 @@ When `validateOnBlur: true`, errors only appear after the user leaves a field.
 `touchedFields` tracks which fields have been interacted with; `dirtyFields` tracks which differ from their initial value.
 
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type ContactForm = { name: string; email: string; message: string };
 
@@ -716,14 +692,15 @@ export function ContactForm() {
     validations: [
       {
         field: 'name',
-        validations: [{ type: ValidationType.Required }, { type: ValidationType.MinLength, value: 2 }],
+        validations: rule().required().minLength(2).build(),
       },
       {
         field: 'email',
-        validations: [{ type: ValidationType.Required }, { type: ValidationType.Email }],
+        validations: rule().required().email().build(),
       },
       {
         field: 'message',
+        // traditional form — also valid
         validations: [{ type: ValidationType.Required }, { type: ValidationType.MinLength, value: 10 }],
       },
     ],
@@ -786,7 +763,7 @@ export function ContactForm() {
 ### GreaterThan, LessThan, Precision
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type PriceForm = { price: number; discount: number; tax: number };
 
@@ -794,25 +771,26 @@ const validator = new ValiValid<PriceForm>([
   {
     field: 'price',
     isDecimal: true,
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.GreaterThan, value: 0, message: 'Price must be positive.' },
-      { type: ValidationType.LessThan,    value: 10000, message: 'Price cannot exceed $10,000.' },
-      { type: ValidationType.Precision,   value: 2, message: 'Max 2 decimal places.' },
-    ],
+    validations: rule()
+      .required()
+      .greaterThan(0, 'Price must be positive.')
+      .lessThan(10000, 'Price cannot exceed $10,000.')
+      .precision(2, 'Max 2 decimal places.')
+      .build(),
   },
   {
     field: 'discount',
     isDecimal: true,
-    validations: [
-      { type: ValidationType.GreaterThan, value: -1 },   // >= 0
-      { type: ValidationType.LessThan,    value: 100 },  // < 100%
-      { type: ValidationType.Precision,   value: 2 },
-    ],
+    validations: rule()
+      .greaterThan(-1)  // >= 0
+      .lessThan(100)    // < 100%
+      .precision(2)
+      .build(),
   },
   {
     field: 'tax',
     isDecimal: true,
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Precision, value: 4 }, // e.g. 0.1525
     ],
@@ -826,20 +804,21 @@ console.log(validator.validateSync({ price: 99.999, discount: 101, tax: 0.12345 
 ### DateAfter, DateBefore
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type EventForm = { startDate: string; endDate: string };
 
 const eventValidator = new ValiValid<EventForm>([
   {
     field: 'startDate',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.DateAfter, value: new Date(), message: 'Start date must be in the future.' },
-    ],
+    validations: rule()
+      .required()
+      .dateAfter(new Date(), 'Start date must be in the future.')
+      .build(),
   },
   {
     field: 'endDate',
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Required },
       { type: ValidationType.DateAfter, value: '2025-01-01' },
@@ -855,23 +834,20 @@ console.log(eventValidator.validateFieldSync('startDate', '2028-06-01')); // nul
 ### OneOf
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type SettingsForm = { theme: string; language: string };
 
 const settingsValidator = new ValiValid<SettingsForm>([
   {
     field: 'theme',
-    validations: [
-      {
-        type: ValidationType.OneOf,
-        value: ['light', 'dark', 'system'],
-        message: 'Theme must be light, dark, or system.',
-      },
-    ],
+    validations: rule()
+      .oneOf(['light', 'dark', 'system'], 'Theme must be light, dark, or system.')
+      .build(),
   },
   {
     field: 'language',
+    // traditional form — also valid
     validations: [
       { type: ValidationType.OneOf, value: ['en', 'es', 'fr', 'de', 'pt'] },
     ],
@@ -890,7 +866,7 @@ console.log(settingsValidator.validateFieldSync('language', 'jp')); // error
 ### ArrayMinLength, ArrayMaxLength, ArrayUnique, ArrayContains
 
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type TagForm = { tags: string[]; categories: string[]; permissions: string[] };
 
@@ -899,21 +875,19 @@ const { form, errors, validate } = useValiValid<TagForm>({
   validations: [
     {
       field: 'tags',
-      validations: [
-        { type: ValidationType.ArrayMinLength, value: 1, message: 'Add at least one tag.' },
-        { type: ValidationType.ArrayMaxLength, value: 10, message: 'Max 10 tags allowed.' },
-        { type: ValidationType.ArrayUnique, message: 'Duplicate tags are not allowed.' },
-      ],
+      validations: rule()
+        .arrayMinLength(1, 'Add at least one tag.')
+        .arrayMaxLength(10, 'Max 10 tags allowed.')
+        .arrayUnique('Duplicate tags are not allowed.')
+        .build(),
     },
     {
       field: 'categories',
-      validations: [
-        { type: ValidationType.ArrayMinLength, value: 1 },
-        { type: ValidationType.ArrayUnique },
-      ],
+      validations: rule().arrayMinLength(1).arrayUnique().build(),
     },
     {
       field: 'permissions',
+      // traditional form — also valid
       validations: [
         {
           type: ValidationType.ArrayContains,
@@ -934,19 +908,19 @@ const addTag = (tag: string) => {
 
 ```ts
 // Standalone checks
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type ListForm = { items: string[] };
 
 const v = new ValiValid<ListForm>([
   {
     field: 'items',
-    validations: [
-      { type: ValidationType.ArrayMinLength, value: 2 },
-      { type: ValidationType.ArrayMaxLength, value: 5 },
-      { type: ValidationType.ArrayUnique },
-      { type: ValidationType.ArrayContains, value: 'required-item' },
-    ],
+    validations: rule()
+      .arrayMinLength(2)
+      .arrayMaxLength(5)
+      .arrayUnique()
+      .arrayContains('required-item')
+      .build(),
   },
 ]);
 
@@ -965,7 +939,7 @@ console.log(v.validateFieldSync('items', ['required-item', 'b', 'c', 'd', 'e', '
 Ensures a field does **not** equal another field (e.g., new password ≠ old password).
 
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type PasswordChangeForm = {
   currentPassword: string;
@@ -980,30 +954,23 @@ export function ChangePasswordForm() {
       validations: [
         {
           field: 'currentPassword',
+          // traditional form — also valid
           validations: [{ type: ValidationType.Required }],
         },
         {
           field: 'newPassword',
-          validations: [
-            { type: ValidationType.Required },
-            { type: ValidationType.PasswordStrength },
-            {
-              type: ValidationType.NotMatchField,
-              field: 'currentPassword',
-              message: 'New password must differ from the current one.',
-            },
-          ],
+          validations: rule()
+            .required()
+            .passwordStrength()
+            .notMatchField('currentPassword', 'New password must differ from the current one.')
+            .build(),
         },
         {
           field: 'confirmNewPassword',
-          validations: [
-            { type: ValidationType.Required },
-            {
-              type: ValidationType.MatchField,
-              field: 'newPassword',
-              message: 'Passwords do not match.',
-            },
-          ],
+          validations: rule()
+            .required()
+            .matchField('newPassword', 'Passwords do not match.')
+            .build(),
         },
       ],
     });
@@ -1018,7 +985,7 @@ export function ChangePasswordForm() {
             onChange={(e) => handleChange(field, e.target.value)}
             placeholder={field}
           />
-          {errors[field] && <p style={{ color: 'red' }}>{errors[field]}</p>}
+          {errors[field]?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
         </div>
       ))}
       <button type="submit" disabled={!isValid}>Update password</button>
@@ -1032,7 +999,7 @@ export function ChangePasswordForm() {
 The field is required **unless** the condition is true.
 
 ```tsx
-import { useValiValid, ValidationType } from 'vali-valid';
+import { rule, useValiValid, ValidationType } from 'vali-valid';
 
 type ShippingForm = {
   method: 'pickup' | 'delivery' | '';
@@ -1045,29 +1012,29 @@ export function ShippingForm() {
     useValiValid<ShippingForm>({
       initial: { method: '', address: '', pickupStore: '' },
       validations: [
-        { field: 'method', validations: [{ type: ValidationType.Required }] },
+        {
+          field: 'method',
+          // traditional form — also valid
+          validations: [{ type: ValidationType.Required }],
+        },
         {
           field: 'address',
-          validations: [
-            {
-              type: ValidationType.RequiredUnless,
-              // Not required when method is pickup
-              condition: (f) => f.method === 'pickup',
-              message: 'Address is required for home delivery.',
-            },
-            { type: ValidationType.MinLength, value: 10 },
-          ],
+          validations: rule()
+            .requiredUnless(
+              (f) => f.method === 'pickup',
+              'Address is required for home delivery.',
+            )
+            .minLength(10)
+            .build(),
         },
         {
           field: 'pickupStore',
-          validations: [
-            {
-              type: ValidationType.RequiredUnless,
-              // Not required when method is delivery
-              condition: (f) => f.method === 'delivery',
-              message: 'Select a pickup store.',
-            },
-          ],
+          validations: rule()
+            .requiredUnless(
+              (f) => f.method === 'delivery',
+              'Select a pickup store.',
+            )
+            .build(),
         },
       ],
     });
@@ -1079,7 +1046,7 @@ export function ShippingForm() {
         <option value="pickup">Store pickup</option>
         <option value="delivery">Home delivery</option>
       </select>
-      {errors.method && <p style={{ color: 'red' }}>{errors.method}</p>}
+      {errors.method?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
 
       {form.method === 'delivery' && (
         <>
@@ -1088,7 +1055,7 @@ export function ShippingForm() {
             onChange={(e) => handleChange('address', e.target.value)}
             placeholder="Street address"
           />
-          {errors.address && <p style={{ color: 'red' }}>{errors.address}</p>}
+          {errors.address?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
         </>
       )}
 
@@ -1099,7 +1066,7 @@ export function ShippingForm() {
             <option value="downtown">Downtown</option>
             <option value="mall">City Mall</option>
           </select>
-          {errors.pickupStore && <p style={{ color: 'red' }}>{errors.pickupStore}</p>}
+          {errors.pickupStore?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
         </>
       )}
 
@@ -1116,27 +1083,22 @@ export function ShippingForm() {
 ### Time
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type ScheduleForm = { openTime: string; closeTime: string; appointmentTime: string };
 
 const v = new ValiValid<ScheduleForm>([
   {
     field: 'openTime',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Time, format: '24h' }, // HH:MM
-    ],
+    validations: rule().required().time('24h').build(),
   },
   {
     field: 'closeTime',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Time, format: '24h' },
-    ],
+    validations: rule().required().time('24h').build(),
   },
   {
     field: 'appointmentTime',
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Time, format: '12h' }, // HH:MM AM/PM
     ],
@@ -1152,21 +1114,22 @@ console.log(v.validateFieldSync('appointmentTime', '14:00')); // error (not 12h)
 ### NoHTML
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type CommentForm = { body: string; title: string };
 
 const v = new ValiValid<CommentForm>([
   {
     field: 'body',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.NoHTML, message: 'HTML is not allowed in comments.' },
-      { type: ValidationType.MaxLength, value: 2000 },
-    ],
+    validations: rule()
+      .required()
+      .noHtml('HTML is not allowed in comments.')
+      .maxLength(2000)
+      .build(),
   },
   {
     field: 'title',
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Required },
       { type: ValidationType.NoHTML },
@@ -1182,17 +1145,14 @@ console.log(v.validateFieldSync('body', 'Hello <script>xss</script>')); // error
 ### IBAN
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type BankForm = { iban: string };
 
 const v = new ValiValid<BankForm>([
   {
     field: 'iban',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.IBAN, message: 'Enter a valid IBAN.' },
-    ],
+    validations: rule().required().iban('Enter a valid IBAN.').build(),
   },
 ]);
 
@@ -1203,23 +1163,19 @@ console.log(v.validateFieldSync('iban', 'GB00WEST12345698765432')); // error
 ### PostalCode
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
-
-type AddressForm = { zipCode: string; country: string };
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 const usValidator = new ValiValid<{ zipCode: string }>([
   {
     field: 'zipCode',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.PostalCode, country: 'US' },
-    ],
+    validations: rule().required().postalCode('US').build(),
   },
 ]);
 
 const deValidator = new ValiValid<{ zipCode: string }>([
   {
     field: 'zipCode',
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Required },
       { type: ValidationType.PostalCode, country: 'DE' },
@@ -1238,7 +1194,7 @@ Supported country codes: `US`, `CA`, `UK`, `DE`, `FR`, `ES`, `IT`, `AU`, `NL`, `
 ### Latitude & Longitude
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type LocationForm = { lat: number; lng: number };
 
@@ -1246,18 +1202,12 @@ const v = new ValiValid<LocationForm>([
   {
     field: 'lat',
     isDecimal: true,
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Latitude },
-    ],
+    validations: rule().required().latitude().build(),
   },
   {
     field: 'lng',
     isDecimal: true,
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Longitude },
-    ],
+    validations: rule().required().longitude().build(),
   },
 ]);
 
@@ -1268,17 +1218,14 @@ console.log(v.validateSync({ lat: 91, lng: 181 }));            // { lat: '...', 
 ### SemVer
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule } from 'vali-valid';
 
 type PackageForm = { version: string };
 
 const v = new ValiValid<PackageForm>([
   {
     field: 'version',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.SemVer, message: 'Version must follow X.Y.Z format.' },
-    ],
+    validations: rule().required().semVer('Version must follow X.Y.Z format.').build(),
   },
 ]);
 
@@ -1291,20 +1238,21 @@ console.log(v.validateFieldSync('version', 'v1.0.0'));         // error
 ### Base64
 
 ```ts
-import { ValiValid, ValidationType } from 'vali-valid';
+import { ValiValid, rule, ValidationType } from 'vali-valid';
 
 type EncodedForm = { payload: string; thumbnail: string };
 
 const v = new ValiValid<EncodedForm>([
   {
     field: 'payload',
-    validations: [
-      { type: ValidationType.Required },
-      { type: ValidationType.Base64, message: 'Payload must be a valid Base64 string.' },
-    ],
+    validations: rule()
+      .required()
+      .base64('Payload must be a valid Base64 string.')
+      .build(),
   },
   {
     field: 'thumbnail',
+    // traditional form — also valid
     validations: [
       { type: ValidationType.Base64 },
     ],
@@ -1317,4 +1265,75 @@ console.log(v.validateFieldSync('payload', 'not base64!'));       // error
 
 ---
 
-> All examples use TypeScript. JavaScript usage is identical — just drop the type annotations.
+## 14. v3.1.0 — builder syntax + criteriaMode
+
+This example demonstrates the builder API alongside the traditional array syntax, and uses `criteriaMode: 'firstError'` so that each field shows only its first error at a time.
+
+**Validators used:** `Required`, `MinLength`, `PasswordStrength`, `MatchField`
+
+```tsx
+import { rule, useValiValid, ValidationType } from 'vali-valid';
+
+type ChangePasswordForm = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+export function ChangePasswordForm() {
+  const { form, errors, isValid, handleChange, handleSubmit } =
+    useValiValid<ChangePasswordForm>({
+      initial: { currentPassword: '', newPassword: '', confirmPassword: '' },
+      // criteriaMode: 'firstError' — each field shows only its first failing rule
+      criteriaMode: 'firstError',
+      validations: [
+        {
+          field: 'currentPassword',
+          // Builder syntax
+          validations: rule().required().minLength(8).build(),
+        },
+        {
+          field: 'newPassword',
+          // Builder syntax
+          validations: rule().required().passwordStrength().build(),
+        },
+        {
+          field: 'confirmPassword',
+          // Traditional array syntax — also valid, both styles can be mixed
+          validations: [
+            { type: ValidationType.Required },
+            {
+              type: ValidationType.MatchField,
+              field: 'newPassword',
+              message: 'Passwords do not match.',
+            },
+          ],
+        },
+      ],
+    });
+
+  const onSubmit = handleSubmit(async (data) => {
+    await api.changePassword(data);
+  });
+
+  return (
+    <form onSubmit={onSubmit}>
+      {(['currentPassword', 'newPassword', 'confirmPassword'] as const).map((field) => (
+        <div key={field}>
+          <input
+            type="password"
+            value={form[field]}
+            onChange={(e) => handleChange(field, e.target.value)}
+            placeholder={field}
+          />
+          {/* criteriaMode:'firstError' guarantees at most one message per field */}
+          {errors[field]?.map((e, i) => <p key={i} style={{ color: 'red' }}>{e}</p>)}
+        </div>
+      ))}
+      <button type="submit" disabled={!isValid}>Update password</button>
+    </form>
+  );
+}
+```
+
+---

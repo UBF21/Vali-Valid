@@ -59,8 +59,8 @@ export const DEFAULT_ERROR_ASYNC_PATTERN_MESSAGE = 'Validation failed.';
 export const REGEX_ONLY_NUMBERS = /[^\d-]|(?!^)-/g;
 export const REGEX_ONLY_NUMBERS_STRING = /^[0-9]+$/;
 export const REGEX_DECIMALS = /^\d+(\.\d+)?$/;
-export const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const REGEX_URL = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/;
+export const REGEX_EMAIL = /^[a-zA-Z0-9._%+\-]{1,64}@[a-zA-Z0-9.\-]{1,253}\.[a-zA-Z]{2,}$/;
+export const REGEX_URL = /^(https?|ftp):\/\/[^\s/$.?#][^\s]{0,2048}$/;
 export const REGEX_ALPHA = /^[a-zA-Z]+$/;
 export const REGEX_ALPHA_NUMERIC = /^[a-zA-Z0-9]+$/;
 export const REGEX_LOWER_CASE = /^[a-z]+$/;
@@ -72,6 +72,12 @@ export const REGEX_HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 export const REGEX_IPV4 = /^(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
 export const REGEX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const REGEX_PHONE = /^\+?[1-9]\d{6,14}$/;
+export const REGEX_ALPHA_DASH = /^[a-zA-Z0-9_-]+$/;
+export const REGEX_JWT = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]*$/;
+export const REGEX_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const REGEX_UUID_V3 = /^[0-9a-f]{8}-[0-9a-f]{4}-3[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const REGEX_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const REGEX_UUID_V5 = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // --- Sync validators ---
 
@@ -80,7 +86,7 @@ export const validateRequired = (value: any): boolean => {
     if (typeof value === 'number') return true; // 0 is valid
     if (typeof value === 'boolean') return true;
     if (value instanceof File) return value !== null && value !== undefined;
-    if (value instanceof Date) return value !== null;
+    if (value instanceof Date) return !isNaN(value.getTime());
     if (Array.isArray(value)) return value.length > 0;
     return value !== null && value !== undefined;
 };
@@ -119,13 +125,21 @@ export const validateEndsWith = (value: string, suffix: string): boolean =>
 
 export const validateSlug = (value: string): boolean => REGEX_SLUG.test(value);
 
-export const validatePasswordStrength = (value: string): boolean => REGEX_PASSWORD_STRENGTH.test(value);
+export const validatePasswordStrength = (value: string): boolean => {
+    if (typeof value !== 'string' || value.length > 128) return false;
+    return REGEX_PASSWORD_STRENGTH.test(value);
+};
 
 export const validateHexColor = (value: string): boolean => REGEX_HEX_COLOR.test(value);
 
 export const validateIPv4 = (value: string): boolean => REGEX_IPV4.test(value);
 
-export const validateUUID = (value: string): boolean => REGEX_UUID.test(value);
+export const validateUUID = (value: string, version?: 1 | 3 | 4 | 5): boolean => {
+    if (version === 1) return REGEX_UUID_V1.test(value);
+    if (version === 3) return REGEX_UUID_V3.test(value);
+    if (version === 5) return REGEX_UUID_V5.test(value);
+    return REGEX_UUID_V4.test(value); // default v4
+};
 
 export const validateJson = (value: string): boolean => {
     try {
@@ -155,7 +169,8 @@ export const validateCreditCard = (value: string): boolean => {
     return sum % 10 === 0;
 };
 
-export const validateDigitsOnly = (value: string): boolean => REGEX_ONLY_NUMBERS_STRING.test(value);
+export const validateDigitsOnly = (value: any): boolean =>
+    typeof value === 'string' && REGEX_ONLY_NUMBERS_STRING.test(value);
 
 export const validateNumberRange = (value: number, min: number, max: number): boolean =>
     typeof value === 'number' && value >= min && value <= max;
@@ -167,8 +182,12 @@ export const validateNumberNegative = (value: number): boolean => value < 0;
 export const validateInteger = (value: number): boolean =>
     typeof value === 'number' && Number.isInteger(value);
 
+// Simple modulo (value % multiple === 0) cannot be used for decimals because of IEEE 754
+// floating-point representation errors — e.g. 0.3 % 0.1 evaluates to ~5.55e-17, not 0.
+// Rounding to a high (but finite) precision eliminates that noise.
 export const validateMultipleOf = (value: number, multiple: number): boolean =>
-    typeof value === 'number' && multiple !== 0 && value % multiple === 0;
+    typeof value === 'number' && multiple !== 0 &&
+    Math.round((value / multiple) * 1e10) % 1e10 === 0;
 
 export const validateDateFormat = (value: string, format: DateFormat): boolean =>
     DateFormatExpressions[format].test(String(value));
@@ -176,13 +195,15 @@ export const validateDateFormat = (value: string, format: DateFormat): boolean =
 export const validateMinDate = (value: string, minDate: string | Date): boolean => {
     const date = new Date(value);
     const min = new Date(minDate);
-    return !isNaN(date.getTime()) && date >= min;
+    if (isNaN(date.getTime()) || isNaN(min.getTime())) return false;
+    return date >= min;
 };
 
 export const validateMaxDate = (value: string, maxDate: string | Date): boolean => {
     const date = new Date(value);
     const max = new Date(maxDate);
-    return !isNaN(date.getTime()) && date <= max;
+    if (isNaN(date.getTime()) || isNaN(max.getTime())) return false;
+    return date <= max;
 };
 
 export const validateFutureDate = (value: string): boolean => {
@@ -195,11 +216,15 @@ export const validatePastDate = (value: string): boolean => {
     return !isNaN(date.getTime()) && date < new Date();
 };
 
-export const validateFileType = (file: File, allowedTypes: TypeFile[] | string[]): boolean =>
-    allowedTypes.toString().includes(file.type);
+export const validateFileType = (file: File, allowedTypes: TypeFile[] | string[]): boolean => {
+    if (!(file instanceof File)) return false;
+    return (allowedTypes as string[]).includes(file.type);
+};
 
-export const validateFileSize = (file: File, maxSize: number | FileSize): boolean =>
-    file.size <= maxSize;
+export const validateFileSize = (file: File, maxSize: number | FileSize): boolean => {
+    if (!(file instanceof File)) return false;
+    return file.size <= maxSize;
+};
 
 // --- Async image validators ---
 
@@ -207,13 +232,17 @@ export const validateImageDimensions = async (
     file: File,
     dimensions: { width: number; height: number }
 ): Promise<boolean> => {
+    let url = '';
     try {
         const img = new Image();
-        img.src = URL.createObjectURL(file);
+        url = URL.createObjectURL(file);
+        img.src = url;
         await img.decode();
-        URL.revokeObjectURL(img.src);
+        URL.revokeObjectURL(url);
+        url = '';
         return img.width === dimensions.width && img.height === dimensions.height;
     } catch {
+        if (url) URL.revokeObjectURL(url);
         return false;
     }
 };
@@ -223,15 +252,19 @@ export const validateImageAspectRatio = async (
     ratio: { width: number; height: number },
     tolerance = 0.01
 ): Promise<boolean> => {
+    let url = '';
     try {
         const img = new Image();
-        img.src = URL.createObjectURL(file);
+        url = URL.createObjectURL(file);
+        img.src = url;
         await img.decode();
-        URL.revokeObjectURL(img.src);
+        URL.revokeObjectURL(url);
+        url = '';
         const expected = ratio.width / ratio.height;
         const actual = img.width / img.height;
         return Math.abs(actual - expected) <= tolerance;
     } catch {
+        if (url) URL.revokeObjectURL(url);
         return false;
     }
 };
@@ -240,15 +273,19 @@ export const validateImageMinDimensions = async (
     file: File,
     min: { width?: number; height?: number }
 ): Promise<boolean> => {
+    let url = '';
     try {
         const img = new Image();
-        img.src = URL.createObjectURL(file);
+        url = URL.createObjectURL(file);
+        img.src = url;
         await img.decode();
-        URL.revokeObjectURL(img.src);
+        URL.revokeObjectURL(url);
+        url = '';
         if (min.width !== undefined && img.width < min.width) return false;
         if (min.height !== undefined && img.height < min.height) return false;
         return true;
     } catch {
+        if (url) URL.revokeObjectURL(url);
         return false;
     }
 };
@@ -257,22 +294,27 @@ export const validateImageMaxDimensions = async (
     file: File,
     max: { width?: number; height?: number }
 ): Promise<boolean> => {
+    let url = '';
     try {
         const img = new Image();
-        img.src = URL.createObjectURL(file);
+        url = URL.createObjectURL(file);
+        img.src = url;
         await img.decode();
-        URL.revokeObjectURL(img.src);
+        URL.revokeObjectURL(url);
+        url = '';
         if (max.width !== undefined && img.width > max.width) return false;
         if (max.height !== undefined && img.height > max.height) return false;
         return true;
     } catch {
+        if (url) URL.revokeObjectURL(url);
         return false;
     }
 };
 
 // --- Number sanitization ---
 export const sanitizeNumber = (value: any): number => {
-    return Number(String(value).replace(REGEX_ONLY_NUMBERS, ''));
+    const n = Number(String(value).replace(REGEX_ONLY_NUMBERS, ''));
+    return isNaN(n) ? 0 : n;
 };
 
 // --- v2.1 new validators ---
@@ -282,7 +324,8 @@ export const validateGreaterThan = (value: any, n: number): boolean => Number(va
 export const validateLessThan = (value: any, n: number): boolean => Number(value) < n;
 
 export const validatePrecision = (value: any, n: number): boolean => {
-    const str = String(value);
+    const normalized = typeof value === 'number' ? parseFloat(value.toPrecision(15)) : value;
+    const str = String(normalized);
     const dotIndex = str.indexOf('.');
     if (dotIndex === -1) return true;
     return str.length - dotIndex - 1 <= n;
@@ -321,7 +364,13 @@ export const validateArrayMaxLength = (value: any, n: number): boolean =>
 
 export const validateArrayUnique = (value: any): boolean => {
     if (!Array.isArray(value)) return false;
-    return new Set(value).size === value.length;
+    const seen: string[] = [];
+    for (const item of value) {
+        const key = JSON.stringify(item);
+        if (seen.includes(key)) return false;
+        seen.push(key);
+    }
+    return true;
 };
 
 export const validateArrayContains = (value: any, item: any): boolean =>
@@ -389,4 +438,61 @@ export const validateSemVer = (value: string): boolean => REGEX_SEMVER.test(valu
 const REGEX_BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 export const validateBase64 = (value: string): boolean =>
-    typeof value === 'string' && REGEX_BASE64.test(value) && value.length % 4 === 0;
+    typeof value === 'string' && value.length > 0 && REGEX_BASE64.test(value) && value.length % 4 === 0;
+
+export const validateNotOneOf = (value: any, options: any[]): boolean => !options.includes(value);
+
+const REGEX_IPV6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(:[0-9a-fA-F]{1,4}){1,6}|:(:[0-9a-fA-F]{1,4}){1,7}|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4})?:)?(25[0-5]|(2[0-4]|1?[0-9])?[0-9])(\.(25[0-5]|(2[0-4]|1?[0-9])?[0-9])){3}|([0-9a-fA-F]{1,4}:){1,4}:(25[0-5]|(2[0-4]|1?[0-9])?[0-9])(\.(25[0-5]|(2[0-4]|1?[0-9])?[0-9])){3}|::)$/;
+
+export const validateIPv6 = (value: string): boolean =>
+    typeof value === 'string' && value.length <= 45 && REGEX_IPV6.test(value);
+
+const REGEX_MAC = /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$/;
+
+export const validateMACAddress = (value: string): boolean => REGEX_MAC.test(value);
+
+const REGEX_DATA_URI = /^data:[a-zA-Z0-9]{1,50}[a-zA-Z0-9!#$&\-^_]{0,50}\/[a-zA-Z0-9]{1,50}[a-zA-Z0-9!#$&\-^_]{0,50};base64,[A-Za-z0-9+/]{4,10485760}={0,2}$/;
+
+export const validateDataURI = (value: string): boolean =>
+    typeof value === 'string' && REGEX_DATA_URI.test(value);
+
+export const validateMimeType = (value: any, allowedTypes: string[]): boolean => {
+    const mimeType: string =
+        typeof value === 'string' ? value :
+        value != null && typeof value.type === 'string' ? value.type : '';
+    if (!mimeType) return false;
+    return allowedTypes.some((pattern) => {
+        if (pattern.endsWith('/*')) {
+            const prefix = pattern.slice(0, -1); // e.g. "image/"
+            return mimeType.startsWith(prefix);
+        }
+        return mimeType === pattern;
+    });
+};
+
+// --- v4 new validators ---
+
+export const validateAlphaDash = (v: string): boolean => REGEX_ALPHA_DASH.test(v);
+export const validateNotEmpty = (v: any): boolean => typeof v === 'string' && v.trim() !== '';
+export const validateJWT = (v: string): boolean => REGEX_JWT.test(v);
+export const validateFinite = (v: any): boolean => Number.isFinite(Number(v));
+export const validatePort = (v: any): boolean => { const n = Number(v); return Number.isInteger(n) && n >= 0 && n <= 65535; };
+export const validateGreaterThanOrEqual = (v: any, n: number): boolean => Number(v) >= n;
+export const validateLessThanOrEqual = (v: any, n: number): boolean => Number(v) <= n;
+export const validateDateAfterField = (v: any, other: any): boolean => {
+    const d = new Date(v), o = new Date(other);
+    return !isNaN(d.getTime()) && !isNaN(o.getTime()) && d > o;
+};
+export const validateDateBeforeField = (v: any, other: any): boolean => {
+    const d = new Date(v), o = new Date(other);
+    return !isNaN(d.getTime()) && !isNaN(o.getTime()) && d < o;
+};
+export const validateArrayExactLength = (v: any, n: number): boolean => Array.isArray(v) && v.length === n;
+
+// --- Synthetic rule type identifiers ---
+export const SYNTHETIC_OR       = '__or__'       as const;
+export const SYNTHETIC_NOT      = '__not__'      as const;
+export const SYNTHETIC_IF       = '__if__'       as const;
+export const SYNTHETIC_OPTIONAL = '__optional__' as const;
+export const SYNTHETIC_NULLABLE = '__nullable__' as const;
+export const SYNTHETIC_BAIL     = '__bail__'     as const;

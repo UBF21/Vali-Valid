@@ -86,4 +86,27 @@ export const en: Record<string, string | ((...args: any[]) => string)> = {
     longitude: 'The value must be a valid longitude (-180 to 180).',
     semVer: 'Invalid semantic version (expected X.Y.Z).',
     base64: 'Invalid Base64 string.',
+    // v3 — new validators
+    notOneOf: (values: any[]) => `The value must not be one of: ${values.join(', ')}.`,
+    ipv6: 'Invalid IPv6 address.',
+    macAddress: 'Invalid MAC address.',
+    dataURI: 'Invalid Data URI.',
+    mimeType: 'File MIME type not allowed.',
+    dateRange: 'Start date must be before or equal to end date.',
+    arrayItems: 'One or more array items are invalid.',
+    // v4 — new validators
+    alphaDash: 'Only letters, numbers, underscores, and hyphens are allowed.',
+    notEmpty: 'The field must not be blank or contain only spaces.',
+    jwt: 'Invalid JWT format.',
+    finite: 'The value must be a finite number.',
+    port: 'The value must be a valid port number (0–65535).',
+    greaterThanOrEqual: (n: number) => `Value must be ≥ ${n}.`,
+    lessThanOrEqual: (n: number) => `Value must be ≤ ${n}.`,
+    dateAfterField: (f: string) => `Date must be after "${f}".`,
+    dateBeforeField: (f: string) => `Date must be before "${f}".`,
+    arrayExactLength: (n: number) => `Array must have exactly ${n} items.`,
+    // Synthetic rules
+    or: 'At least one of the conditions must be met.',
+    not: 'Value must not satisfy this condition.',
+    if: 'Conditional validation failed.',
 };

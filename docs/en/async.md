@@ -54,30 +54,34 @@ The most flexible async type. Provide an `asyncFn` that returns `Promise<boolean
 ### Example: check username availability
 
 ```tsx
+import { rule } from 'vali-valid';
+
 {
   field: 'username',
-  validations: [
-    { type: ValidationType.Required },
-    { type: ValidationType.MinLength, value: 3 },
-    { type: ValidationType.Slug },
-    {
-      type: ValidationType.AsyncPattern,
-      message: 'Username is already taken.',
-      asyncFn: async (value) => {
+  validations: rule()
+    .required()
+    .minLength(3)
+    .slug()
+    .asyncPattern(
+      async (value) => {
         const res = await fetch(`/api/users/check?username=${encodeURIComponent(value)}`);
         const data = await res.json();
         return data.available;
       },
-    },
-  ],
+      'Username is already taken.',
+    )
+    .build(),
 }
 ```
 
 ### Example: validate coupon with form context
 
 ```tsx
+import { rule, ValidationType } from 'vali-valid';
+
 {
   field: 'coupon',
+  // traditional form — also valid
   validations: [
     {
       type: ValidationType.AsyncPattern,
@@ -109,24 +113,17 @@ The most flexible async type. Provide an `asyncFn` that returns `Promise<boolean
 ### Example: profile picture
 
 ```tsx
+import { rule, TypeFile, FileSize } from 'vali-valid';
+
 {
   field: 'avatar',
-  validations: [
-    { type: ValidationType.Required },
-    { type: ValidationType.FileType, value: [TypeFile.JPG, TypeFile.PNG] },
-    { type: ValidationType.FileSize, value: FileSize['5MB'] },
-    {
-      type: ValidationType.ImageAspectRatio,
-      value: { width: 1, height: 1 },
-      tolerance: 0.01,
-      message: 'Profile picture must be square.',
-    },
-    {
-      type: ValidationType.ImageMinDimensions,
-      value: { width: 400, height: 400 },
-      message: 'Minimum size is 400×400 px.',
-    },
-  ],
+  validations: rule()
+    .required()
+    .fileType([TypeFile.JPG, TypeFile.PNG])
+    .fileSize(FileSize['5MB'])
+    .imageAspectRatio({ width: 1, height: 1 }, 0.01, 'Profile picture must be square.')
+    .imageMinDimensions({ width: 400, height: 400 }, 'Minimum size is 400×400 px.')
+    .build(),
 }
 ```
 

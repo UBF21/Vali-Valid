@@ -1,6 +1,6 @@
 # `useValiValid` — Referencia de la API del hook
 
-Es la API pública principal de ValiValid v2. Envuelve el motor `ValiValid` en un hook de React, gestionando el estado del formulario, los errores y el ciclo de vida de la validación asíncrona.
+Es la API pública principal de ValiValid v3. Envuelve el motor `ValiValid` en un hook de React, gestionando el estado del formulario, los errores y el ciclo de vida de la validación asíncrona.
 
 ---
 
@@ -20,6 +20,12 @@ function useValiValid<T extends Record<string, any>>(
 interface UseValiValidOptions<T> {
   initial: T;
   validations?: FieldValidationConfig<T>[];
+  validateOnSubmit?: boolean;  // solo valida después del primer submit
+  debounceMs?: number;         // debounce para validaciones async (ms)
+  // v3.1.0
+  validateOnMount?: boolean;   // valida todos los campos al montar el componente
+  asyncTimeout?: number;       // timeout en ms para validadores async (default 5000)
+  criteriaMode?: 'firstError' | 'all';  // mostrar primer error o todos los errores por campo
 }
 ```
 
@@ -27,6 +33,11 @@ interface UseValiValidOptions<T> {
 |-----------|------|-----------|-------------|
 | `initial` | `T` | Sí | Valores iniciales de todos los campos |
 | `validations` | `FieldValidationConfig<T>[]` | No | Reglas de validación por campo |
+| `validateOnSubmit` | `boolean` | No | Si `true`, suprime errores en tiempo real hasta el primer submit |
+| `debounceMs` | `number` | No | Tiempo de espera en ms antes de ejecutar validaciones asíncronas |
+| `validateOnMount` | `boolean` | No | Si `true`, ejecuta la validación completa al montar el componente |
+| `asyncTimeout` | `number` | No | Tiempo máximo en ms antes de que un validador async se cancele. Por defecto `5000` |
+| `criteriaMode` | `'firstError' \| 'all'` | No | `'firstError'` devuelve solo el primer error por campo (comportamiento v2); `'all'` devuelve todos los errores (por defecto en v3) |
 
 ### `FieldValidationConfig<T>`
 
@@ -36,6 +47,8 @@ type FieldValidationConfig<T> = {
   validations: ValidationsConfig[];  // Array de reglas
   isNumber?: boolean;   // Elimina chars no numéricos → Number entero
   isDecimal?: boolean;  // Convierte directamente → Number decimal
+  transform?: (value: any) => any;  // Transforma el valor antes de validar
+  watchFields?: string[];           // Campos que al cambiar re-validan este campo
 };
 ```
 
@@ -50,11 +63,20 @@ interface UseValiValidReturn<T> {
   errors: FormErrors<T>;
   isValid: boolean;
   isValidating: boolean;
+  isSubmitted: boolean;    // true después del primer handleSubmit
+  submitCount: number;     // número de intentos de submit
 
   // Acciones
   handleChange: (field: keyof T, value: any) => void;
+  handleSubmit: (onSubmit: (data: T) => Promise<void>) => () => Promise<void>;
   validate: () => Promise<FormErrors<T>>;
   reset: (initial?: Partial<T>) => void;
+  setServerErrors: (errors: Partial<Record<keyof T, string[]>>) => void;
+  setValues: (values: Partial<T>) => void;
+
+  // v3.1.0 — Control de validación
+  trigger: (field?: keyof T) => Promise<void>;  // dispara validación para uno o todos los campos
+  clearErrors: (field?: keyof T) => void;       // limpia errores para uno o todos los campos
 
   // Gestión dinámica de reglas
   addFieldValidation: (field: keyof T, validations: ValidationsConfig[]) => void;
@@ -79,17 +101,37 @@ Valores actuales de todos los campos. Se actualiza en cada llamada a `handleChan
 ### `errors: FormErrors<T>`
 
 ```ts
-type FormErrors<T> = { [key in keyof T]?: string | null };
+type FormErrors<T> = { [key in keyof T]?: string[] | null };
 ```
 
 | Valor | Significado |
 |-------|-------------|
-| `string` | Validación fallida — mensaje a mostrar |
+| `string[]` | Validación fallida — array con todos los mensajes de error |
 | `null` | Campo validado correctamente |
 | `undefined` | Campo aún no validado |
 
 ```tsx
-{errors.email && <p className="error">{errors.email}</p>}
+{/* Mostrar todos los errores */}
+{errors.email?.map((msg, i) => <p key={i} className="error">{msg}</p>)}
+
+{/* Mostrar solo el primero */}
+{errors.email?.[0] && <p className="error">{errors.email[0]}</p>}
+```
+
+### `isSubmitted: boolean`
+
+`true` después de que el usuario llama a `handleSubmit` por primera vez. Útil junto con `validateOnSubmit` para controlar cuándo se muestran los errores.
+
+```tsx
+{isSubmitted && errors.email?.map((msg, i) => <p key={i}>{msg}</p>)}
+```
+
+### `submitCount: number`
+
+Número de veces que se ha llamado a `handleSubmit`. Empieza en `0`.
+
+```tsx
+{submitCount > 0 && <p>Ya intentaste enviar {submitCount} veces.</p>}
 ```
 
 ### `isValid: boolean`
@@ -142,6 +184,22 @@ Para checkboxes y selects:
 
 ---
 
+### `handleSubmit(onSubmit)`
+
+Helper de submit de v3. Recibe una función `async` que se ejecuta solo si todas las validaciones pasan. Gestiona automáticamente `isSubmitted` y `submitCount`.
+
+```tsx
+const onSubmit = handleSubmit(async (data) => {
+  await api.guardarPerfil(data);
+});
+
+return <form onSubmit={onSubmit}>…</form>;
+```
+
+Equivale a llamar a `validate()`, comprobar errores y llamar a tu función de envío — pero en una sola línea.
+
+---
+
 ### `validate(): Promise<FormErrors<T>>`
 
 Valida el formulario completo (síncronas + asíncronas). Llámalo al enviar para capturar campos no tocados por el usuario.
@@ -176,6 +234,85 @@ reset({ email: 'prefill@ejemplo.com' });
 
 ---
 
+### `setServerErrors(errors)`
+
+Inyecta errores del servidor directamente en el estado de errores del formulario. Ideal para manejar errores de validación retornados por una API tras el submit.
+
+```tsx
+const onSubmit = handleSubmit(async (data) => {
+  const res = await api.registrar(data);
+  if (res.errors) {
+    // { email: ['Este email ya está registrado.'], username: ['Nombre de usuario no disponible.'] }
+    setServerErrors(res.errors);
+  }
+});
+```
+
+---
+
+### `setValues(values)`
+
+Asigna múltiples campos del formulario a la vez sin disparar validación por campo individual.
+
+```tsx
+// Prellenar campos desde un perfil existente
+setValues({
+  nombre: usuario.nombre,
+  email: usuario.email,
+  bio: usuario.bio,
+});
+```
+
+---
+
+### `trigger(field?)` _(v3.1.0)_
+
+Dispara la validación manualmente para un campo específico o para todos los campos del formulario. Útil cuando necesitas validar sin que el usuario haya interactuado con el campo.
+
+```tsx
+// Validar un campo específico
+await trigger('email');
+
+// Validar todos los campos (equivale a validate())
+await trigger();
+```
+
+```tsx
+// Ejemplo: validar al cambiar de pestaña en un formulario multi-paso
+const handleNextStep = async () => {
+  await trigger('nombre');
+  await trigger('email');
+  if (isValid) setStep(2);
+};
+```
+
+---
+
+### `clearErrors(field?)` _(v3.1.0)_
+
+Limpia los errores de un campo específico o de todos los campos del formulario sin modificar los valores actuales.
+
+```tsx
+// Limpiar el error de un campo
+clearErrors('email');
+
+// Limpiar todos los errores
+clearErrors();
+```
+
+```tsx
+// Ejemplo: limpiar errores del servidor al re-editar el campo
+<input
+  value={form.email}
+  onChange={(e) => {
+    clearErrors('email');         // limpia el error mientras el usuario edita
+    handleChange('email', e.target.value);
+  }}
+/>
+```
+
+---
+
 ## Gestión dinámica de reglas
 
 Consulta [dynamic.md](./dynamic.md) para ejemplos detallados.
@@ -185,9 +322,7 @@ Consulta [dynamic.md](./dynamic.md) para ejemplos detallados.
 Agrega nuevas reglas a un campo sin eliminar las existentes.
 
 ```ts
-addFieldValidation('username', [
-  { type: ValidationType.MinLength, value: 3 },
-]);
+addFieldValidation('username', rule().minLength(3).build());
 ```
 
 ### `removeFieldValidation(field, type)`
@@ -203,9 +338,7 @@ removeFieldValidation('username', ValidationType.MinLength);
 Reemplaza **todas** las reglas de un campo.
 
 ```ts
-setFieldValidations('rol', [
-  { type: ValidationType.Required },
-]);
+setFieldValidations('rol', rule().required().build());
 ```
 
 ### `clearFieldValidations(field)`
@@ -221,7 +354,7 @@ clearFieldValidations('codigoCupon');
 ## Ejemplo completo con todas las funcionalidades
 
 ```tsx
-import { useValiValid, ValidationType, TypeFile, FileSize } from 'vali-valid';
+import { rule, useValiValid, ValidationType, TypeFile, FileSize } from 'vali-valid';
 
 type PerfilForm = {
   username: string;
@@ -251,50 +384,44 @@ function EditorPerfil() {
     validations: [
       {
         field: 'username',
-        validations: [
-          { type: ValidationType.Required },
-          { type: ValidationType.MinLength, value: 3 },
-          { type: ValidationType.MaxLength, value: 20 },
-          { type: ValidationType.Slug },
-        ],
+        validations: rule()
+          .required()
+          .minLength(3)
+          .maxLength(20)
+          .slug()
+          .build(),
       },
       {
         field: 'email',
-        validations: [
-          { type: ValidationType.Required },
-          { type: ValidationType.Email },
-          {
-            type: ValidationType.AsyncPattern,
-            message: 'Este email ya está registrado.',
-            asyncFn: async (value) => {
+        validations: rule()
+          .required()
+          .email()
+          .asyncPattern(
+            async (value) => {
               const res = await fetch(`/api/check-email?email=${value}`);
               const { disponible } = await res.json();
               return disponible;
             },
-          },
-        ],
+            'Este email ya está registrado.',
+          )
+          .build(),
       },
       {
         field: 'sitioWeb',
+        // forma tradicional — también funciona
         validations: [{ type: ValidationType.Url }],
       },
       {
         field: 'avatar',
-        validations: [
-          { type: ValidationType.FileType, value: [TypeFile.JPG, TypeFile.PNG] },
-          { type: ValidationType.FileSize, value: FileSize['2MB'] },
-          {
-            type: ValidationType.ImageAspectRatio,
-            value: { width: 1, height: 1 },
-            message: 'El avatar debe ser cuadrado (1:1).',
-          },
-        ],
+        validations: rule()
+          .fileType([TypeFile.JPG, TypeFile.PNG])
+          .fileSize(FileSize['2MB'])
+          .imageAspectRatio({ width: 1, height: 1 }, 0, 'El avatar debe ser cuadrado (1:1).')
+          .build(),
       },
       {
         field: 'bio',
-        validations: [
-          { type: ValidationType.MaxLength, value: 160 },
-        ],
+        validations: rule().maxLength(160).build(),
       },
     ],
   });
@@ -312,7 +439,7 @@ function EditorPerfil() {
         onChange={(e) => handleChange('username', e.target.value)}
         placeholder="username"
       />
-      {errors.username && <p>{errors.username}</p>}
+      {errors.username?.map((msg, i) => <p key={i} style={{ color: 'red' }}>{msg}</p>)}
 
       <input
         type="email"
@@ -320,28 +447,28 @@ function EditorPerfil() {
         onChange={(e) => handleChange('email', e.target.value)}
       />
       {isValidating && <span>Verificando disponibilidad…</span>}
-      {errors.email && <p>{errors.email}</p>}
+      {errors.email?.map((msg, i) => <p key={i} style={{ color: 'red' }}>{msg}</p>)}
 
       <input
         value={form.sitioWeb}
         onChange={(e) => handleChange('sitioWeb', e.target.value)}
         placeholder="https://…"
       />
-      {errors.sitioWeb && <p>{errors.sitioWeb}</p>}
+      {errors.sitioWeb?.map((msg, i) => <p key={i} style={{ color: 'red' }}>{msg}</p>)}
 
       <input
         type="file"
         accept="image/jpeg,image/png"
         onChange={(e) => handleChange('avatar', e.target.files?.[0] ?? null)}
       />
-      {errors.avatar && <p>{errors.avatar}</p>}
+      {errors.avatar?.map((msg, i) => <p key={i} style={{ color: 'red' }}>{msg}</p>)}
 
       <textarea
         value={form.bio}
         onChange={(e) => handleChange('bio', e.target.value)}
         maxLength={160}
       />
-      {errors.bio && <p>{errors.bio}</p>}
+      {errors.bio?.map((msg, i) => <p key={i} style={{ color: 'red' }}>{msg}</p>)}
 
       <button type="submit" disabled={isValidating}>
         Guardar
